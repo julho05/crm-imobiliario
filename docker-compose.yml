@@ -1,0 +1,30 @@
+# MySQL para DESENVOLVIMENTO apenas.
+# A producao nao usa Docker (ver docs/architecture.md).
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: crm_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina no arquivo .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-crm_dev}
+      MYSQL_USER: ${MYSQL_USER:-crm}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?defina no arquivo .env}
+    ports:
+      # 127.0.0.1 na frente limita o acesso a esta maquina.
+      # Sem isso o MySQL fica exposto a toda a rede local (wi-fi, cafe, hotel).
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  mysql_data:

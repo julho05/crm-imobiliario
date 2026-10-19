@@ -1,0 +1,28 @@
+/* Tokens minimos. O design system completo vem depois
+   (ver docs/design-system.md). */
+:root {
+  --navy: #142b3b;
+  --gold: #c5a46d;
+  --bg: #f5f7f9;
+  --surface: #ffffff;
+  --text: #142b3b;
+  --muted: #5b6b7a;
+  --border: #e2e8ef;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
