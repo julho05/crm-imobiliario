@@ -41,6 +41,25 @@ A página inicial consulta a API sozinha e mostra se as duas peças estão conve
 
 > O Docker Desktop precisa estar **aberto** antes do `npm run db:up`.
 
+## Trabalhando em mais de um computador
+
+```bash
+# Ao sentar para trabalhar
+git pull
+npm install        # só se o package.json mudou
+npm run db:up
+npm run dev
+
+# Ao terminar, antes de sair
+git add -A
+git commit -m "descrição do que foi feito"
+git push
+```
+
+**Antes de fechar o computador, rode `git status`.** Se aparecer arquivo em vermelho ou a frase *"your branch is ahead"*, falta enviar. Esquecer o `push` é o que gera conflito depois.
+
+O que **não** sincroniza entre máquinas: o `.env` (cada uma tem as suas senhas), os dados do banco, e o `node_modules/`. A estrutura do banco sincroniza, porque as migrations são arquivos.
+
 ## Comandos
 
 | Comando | O que faz |

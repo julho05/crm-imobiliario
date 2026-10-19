@@ -35,8 +35,6 @@ desktop.ini
 !.vscode/settings.json
 .idea/
 
-# Arquivos locais de ferramenta de edicao - nao versionados
-CLAUDE.md
-PROMPT-INICIAL-CLAUDE.md
+# Gerado automaticamente pelo Next.js a cada "next dev"
 AGENTS.md
 apps/*/AGENTS.md
