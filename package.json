@@ -14,13 +14,33 @@
     "dev": "concurrently --names \"API,WEB\" --prefix-colors \"cyan,magenta\" \"npm run dev -w @app/api\" \"npm run dev -w @app/web\"",
     "dev:api": "npm run dev -w @app/api",
     "dev:web": "npm run dev -w @app/web",
-    "build": "npm run build -w @app/api && npm run build -w @app/web",
+    "build": "npm run build -w @app/shared && npm run build -w @app/api && npm run build -w @app/web",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "test": "npm run build:shared && vitest run",
+    "test:watch": "vitest",
+    "verify": "npm run lint && npm run format:check && npm run typecheck && npm run test",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:logs": "docker compose logs -f mysql"
+    "db:logs": "docker compose logs -f mysql",
+    "db:generate": "npm run db:generate -w @app/api",
+    "db:migrate": "npm run db:migrate -w @app/api",
+    "db:status": "npm run db:status -w @app/api",
+    "db:studio": "npm run db:studio -w @app/api",
+    "db:drift": "npm run db:drift -w @app/api",
+    "build:shared": "npm run build -w @app/shared"
   },
   "devDependencies": {
     "concurrently": "10.0.6",
-    "typescript": "6.0.3"
+    "eslint": "10.13.0",
+    "eslint-config-next": "16.4.2",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
+    "vitest": "5.0.5"
   }
 }

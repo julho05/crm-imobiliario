@@ -1,0 +1,11 @@
+{
+  // O tsconfig.json exclui *.spec.ts para que os testes nao entrem no dist/
+  // publicado. O efeito colateral e que eles tambem ficariam fora da
+  // verificacao de tipos. Este arquivo existe para cobri-los.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

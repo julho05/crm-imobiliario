@@ -1,28 +1,217 @@
-/* Tokens minimos. O design system completo vem depois
-   (ver docs/design-system.md). */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* O modo escuro e por classe no <html>, controlada pelo next-themes.
+   Classe, e nao prefers-color-scheme, porque a escolha e do usuario e fica
+   guardada no perfil (User.themePreference). */
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Cores da marca
+   ---------------------------------------------------------------------------
+   Os dois tons oficiais de docs/design-system.md, e uma terceira variante que
+   o contraste obrigou a existir.
+
+   Contraste medido (WCAG 2.1, texto normal exige 4.5:1):
+
+     #142B3B sobre branco .............. 14.60:1  passa
+     #142B3B sobre #F5F7F9 ............. 13.59:1  passa
+     #C5A46D sobre branco ..............  2.36:1  REPROVA
+     #C5A46D sobre #F5F7F9 .............  2.20:1  REPROVA
+     #142B3B sobre #C5A46D .............  6.19:1  passa
+     #C5A46D sobre #1C2A38 .............  6.19:1  passa
+     #826C48 sobre branco ..............  5.01:1  passa
+     #826C48 sobre #F5F7F9 .............  4.67:1  passa
+
+   Conclusao pratica, que o design-system.md ja intuia e a medicao confirma:
+   o dourado oficial NAO pode ser texto em fundo claro. Ele funciona como
+   fundo (com texto azul-marinho em cima), como detalhe, e como texto no tema
+   escuro. Quando o dourado precisa ser texto, icone sozinho ou anel de foco
+   no tema claro, usa-se --gold-strong.
+   --------------------------------------------------------------------------- */
+
 :root {
   --navy: #142b3b;
   --gold: #c5a46d;
-  --bg: #f5f7f9;
-  --surface: #ffffff;
-  --text: #142b3b;
-  --muted: #5b6b7a;
+  --gold-strong: #826c48;
+
+  --radius: 0.625rem;
+
+  /* Tema claro, o padrao (docs/design-system.md). */
+  --background: #f5f7f9;
+  --foreground: #142b3b;
+
+  --card: #ffffff;
+  --card-foreground: #142b3b;
+  --popover: #ffffff;
+  --popover-foreground: #142b3b;
+
+  /* Acao primaria: azul-marinho, que e tambem a identidade. */
+  --primary: #142b3b;
+  --primary-foreground: #ffffff;
+
+  --secondary: #eef2f6;
+  --secondary-foreground: #142b3b;
+
+  /* Em semantica shadcn, --muted e FUNDO e --muted-foreground e TEXTO. */
+  --muted: #eef2f6;
+  --muted-foreground: #5b6b7a;
+
+  /* Dourado como realce e selecao, com texto azul-marinho por cima. */
+  --accent: #c5a46d;
+  --accent-foreground: #142b3b;
+
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+
   --border: #e2e8ef;
+  --input: #cfd8e3;
+  /* Foco sempre visivel, e com contraste suficiente em fundo claro. */
+  --ring: #826c48;
+
+  --sidebar: #142b3b;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #c5a46d;
+  --sidebar-primary-foreground: #142b3b;
+  --sidebar-accent: #1d3a4e;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #24455b;
+  --sidebar-ring: #c5a46d;
+
+  --chart-1: #142b3b;
+  --chart-2: #2f6c8f;
+  --chart-3: #c5a46d;
+  --chart-4: #5b6b7a;
+  --chart-5: #8aa2b4;
 }
 
-* {
-  box-sizing: border-box;
+.dark {
+  --background: #101b26;
+  --foreground: #f8fafc;
+
+  --card: #1c2a38;
+  --card-foreground: #f8fafc;
+  --popover: #1c2a38;
+  --popover-foreground: #f8fafc;
+
+  /* No escuro a acao primaria inverte: o azul-marinho e o proprio fundo, e
+     usar azul sobre azul seria invisivel. */
+  --primary: #f8fafc;
+  --primary-foreground: #142b3b;
+
+  --secondary: #24323f;
+  --secondary-foreground: #f8fafc;
+
+  --muted: #24323f;
+  --muted-foreground: #a7b4c2;
+
+  /* Aqui o dourado pode ser texto: 6.19:1 sobre a superficie escura. */
+  --accent: #c5a46d;
+  --accent-foreground: #101b26;
+
+  --destructive: #f97066;
+  --destructive-foreground: #101b26;
+  --success: #4ade80;
+  --success-foreground: #101b26;
+  --warning: #fbbf24;
+  --warning-foreground: #101b26;
+
+  --border: #2b3a49;
+  --input: #35485a;
+  --ring: #c5a46d;
+
+  /* A sidebar fica mais escura que o conteudo no tema escuro. */
+  --sidebar: #0b141d;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #c5a46d;
+  --sidebar-primary-foreground: #101b26;
+  --sidebar-accent: #1c2a38;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #24323f;
+  --sidebar-ring: #c5a46d;
+
+  --chart-1: #8aa2b4;
+  --chart-2: #4f93b8;
+  --chart-3: #c5a46d;
+  --chart-4: #a7b4c2;
+  --chart-5: #f8fafc;
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
+/* Publica os tokens como utilitarios do Tailwind: bg-background,
+   text-muted-foreground, border-border, rounded-lg e afins. */
+@theme inline {
+  --color-navy: var(--navy);
+  --color-gold: var(--gold);
+  --color-gold-strong: var(--gold-strong);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  line-height: 1.6;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family:
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      sans-serif;
+    line-height: 1.6;
+  }
+
+  /* Foco sempre visivel: exigencia de acessibilidade do CLAUDE.md. Nunca
+     remover sem oferecer um indicador equivalente. */
+  :focus-visible {
+    @apply outline-ring outline-2 outline-offset-2;
+  }
 }

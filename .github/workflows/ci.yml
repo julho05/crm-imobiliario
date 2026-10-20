@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela execucoes antigas do mesmo branch: so o ultimo commit interessa.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+
+    services:
+      # Mesma versao do docker-compose.yml de desenvolvimento.
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root
+          MYSQL_DATABASE: crm_ci
+          MYSQL_USER: crm
+          MYSQL_PASSWORD: ci_senha
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -pci_root"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+          --health-start-period=30s
+
+    env:
+      DATABASE_URL: mysql://crm:ci_senha@127.0.0.1:3306/crm_ci
+      SHADOW_DATABASE_URL: mysql://crm:ci_senha@127.0.0.1:3306/prisma_migrate_shadow_db_diff
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # O mesmo GRANT de docker/mysql/init/01-shadow-db.sh. Aqui e explicito
+      # porque o servico do GitHub Actions nao executa scripts de init.
+      - name: Permitir shadow database
+        run: |
+          mysql -h 127.0.0.1 -u root -pci_root -e "
+            GRANT ALL PRIVILEGES ON \`prisma_migrate_shadow_db%\`.* TO 'crm'@'%';
+            CREATE DATABASE IF NOT EXISTS \`prisma_migrate_shadow_db_diff\`
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+            FLUSH PRIVILEGES;"
+
+      - name: Aplicar migrations
+        run: npm run db:deploy -w @app/api
+
+      # Se o schema e as migrations divergirem, o build nao passa.
+      - name: Conferir desvio do banco
+        run: npm run db:drift
+
+      - run: npm run lint
+
+      - run: npm run format:check
+
+      - run: npm run typecheck
+
+      - run: npm run test
+
+      - run: npm run build

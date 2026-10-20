@@ -61,3 +61,60 @@ Isso é **exclusivo de desenvolvimento**, como o [CLAUDE.md](../CLAUDE.md) permi
 A pasta ainda não é um repositório. O `.gitignore` entra **antes** do primeiro arquivo de código: segredo que entra no histórico não sai sem reescrevê-lo. Mínimo a ignorar: `node_modules/`, `.env*` (exceto `.env.example`), `dist/`, `.next/`, `coverage/`, `*.log`.
 
 Repositório **privado**. O GitHub remoto fica para quando o `gh` estiver autenticado nesta máquina.
+
+---
+
+## Prisma 7 — decisões forçadas pela versão, 20/10/2026
+
+O Prisma 7 mudou três coisas que afetam a forma do código. Nenhuma foi escolha
+nossa; todas são exigência da versão estável fixada (7.10.1).
+
+### A URL de conexão saiu do schema
+
+O bloco `datasource` não aceita mais `url`. A URL agora mora em dois lugares
+diferentes, por propósito:
+
+- **`apps/api/prisma.config.ts`** — para o Prisma Migrate (migrations, diff)
+- **Driver adapter**, em tempo de execução — para o client da aplicação
+
+O `prisma.config.ts` também carrega o `.env` na mão: a CLI do Prisma 7 não lê
+mais `.env` sozinha, e o nosso fica na raiz do monorepo, não em `apps/api`.
+
+### Driver adapter obrigatório: `@prisma/adapter-mariadb`
+
+No Prisma 7 o client recebe a conexão por driver adapter. Para MySQL o adapter
+oficial é o `@prisma/adapter-mariadb` — **não existe** `@prisma/adapter-mysql`.
+É dependência obrigatória, não preferência: sem ela o client não conecta.
+
+Fica encapsulado em `PrismaService` (`apps/api/src/prisma/`), exposto por um
+módulo `@Global()` porque praticamente todo módulo de domínio vai precisar dele.
+
+### O client é gerado dentro de `src/`, e não é versionado
+
+`prisma generate` escreve em `apps/api/src/generated/prisma`. A pasta está no
+`.gitignore`, então `prisma generate` roda antes do `dev` e do `build` — um
+clone novo compila sem passo manual.
+
+### Shadow database: um GRANT no MySQL de desenvolvimento
+
+O `prisma migrate dev` cria e descarta um banco temporário para detectar
+desvios. O usuário de aplicação não pode criar bancos, e sem permissão a
+migration falha com `P3014`.
+
+Resolvido em `docker/mysql/init/01-shadow-db.sh`, que roda na primeira
+inicialização do volume e concede privilégio **restrito ao padrão**
+`prisma_migrate_shadow_db%`. O usuário continua sem poder criar qualquer outro
+banco. É exclusivo de desenvolvimento: em produção as migrations rodam com
+`prisma migrate deploy`, que não usa shadow database.
+
+### Quebras de linha fixadas em `.gitattributes`
+
+Essa máquina tem `core.autocrlf=true`. Um script `.sh` entregue com CRLF ao
+container Linux falha com "bad interpreter". O `.gitattributes` força LF,
+independente da configuração local do Git de quem clonar.
+
+### Armadilha de versão, confirmada mais uma vez
+
+`npm view prisma version` devolve `8.0.0-rc.23`. A estável está na tag `prev`
+(`7.10.1`). A própria CLI exibe um banner sugerindo atualizar para o RC —
+**ignorar**. Toda dependência do Prisma está fixada com `--save-exact`.

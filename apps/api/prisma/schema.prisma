@@ -1,0 +1,624 @@
+// Schema gerado a partir de docs/data-model.md (revisao de 19/10/2026).
+// Convencoes do §1 daquele documento, aplicadas a todas as tabelas:
+//   - chave primaria cuid() em CHAR(25)
+//   - createdAt / updatedAt em toda tabela
+//   - dinheiro em Decimal(12,2), nunca Float
+//   - texto indexado em VARCHAR(191)
+//   - organizationId presente em TODA tabela privada, mesmo quando dedutivel
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// A URL de conexao NAO mora aqui. No Prisma 7 ela fica em prisma.config.ts
+// (para o Migrate) e no driver adapter (para o client em tempo de execucao).
+datasource db {
+  provider = "mysql"
+}
+
+// ---------------------------------------------------------------------------
+// 3.1 Identidade e acesso
+// ---------------------------------------------------------------------------
+
+enum ThemePreference {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id              String          @id @default(cuid()) @db.Char(25)
+  name            String          @db.VarChar(191)
+  email           String          @unique @db.VarChar(191)
+  emailVerifiedAt DateTime?
+  passwordHash    String          @db.VarChar(255)
+  themePreference ThemePreference @default(LIGHT)
+  avatarObjectKey String?         @db.VarChar(255)
+
+  // Conveniencia de interface. NUNCA e fonte de autorizacao: a organizacao
+  // ativa vem da sessao e e revalidada contra Membership a cada requisicao.
+  lastActiveOrganizationId String? @db.Char(25)
+
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  memberships             Membership[]
+  sessions                Session[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  platformAdmin           PlatformAdmin?
+}
+
+enum OrganizationKind {
+  SOLO
+  AGENCY
+}
+
+enum OrganizationPlan {
+  FREE
+  PRO
+}
+
+// Existe como coluna para que a opcao futura nao exija migracao
+// (permissions.md §4.2). No MVP so OWN e usado.
+enum LeadVisibility {
+  OWN
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model Organization {
+  id             String             @id @default(cuid()) @db.Char(25)
+  name           String             @db.VarChar(191)
+  slug           String             @unique @db.VarChar(191)
+  kind           OrganizationKind
+  logoObjectKey  String?            @db.VarChar(255)
+  publicEmail    String?            @db.VarChar(191)
+  publicPhone    String?            @db.VarChar(32)
+  publicBio      String?            @db.Text
+  plan           OrganizationPlan   @default(FREE)
+  leadVisibility LeadVisibility     @default(OWN)
+  status         OrganizationStatus @default(ACTIVE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  memberships      Membership[]
+  invitations      Invitation[]
+  properties       Property[]
+  propertyMedia    PropertyMedia[]
+  propertyFeatures PropertyFeature[]
+  leads            Lead[]
+  inquiries        Inquiry[]
+  pipelineStages   PipelineStage[]
+  deals            Deal[]
+  visits           Visit[]
+  tasks            Task[]
+  activities       Activity[]
+  slugHistory      OrganizationSlugHistory[]
+}
+
+// A unicidade de slug e verificada contra AS DUAS tabelas: ninguem pode
+// adotar um slug que ainda redireciona para outra organizacao.
+model OrganizationSlugHistory {
+  id             String   @id @default(cuid()) @db.Char(25)
+  organizationId String   @db.Char(25)
+  slug           String   @unique @db.VarChar(191)
+  releasedAt     DateTime
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  AGENT
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+// O vinculo. E aqui que mora o papel.
+// Exatamente um OWNER ativo por organizacao: MySQL nao expressa isso em
+// constraint parcial, logo e garantido em transacao na aplicacao + teste.
+model Membership {
+  id             String           @id @default(cuid()) @db.Char(25)
+  userId         String           @db.Char(25)
+  organizationId String           @db.Char(25)
+  role           Role
+  status         MembershipStatus @default(ACTIVE)
+  joinedAt       DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  // Remover Membership NUNCA cascateia para imoveis e leads
+  // (permissions.md §4.4 exige destino explicito antes de remover alguem).
+  ownedProperties Property[]
+  assignedLeads   Lead[]
+  assignedDeals   Deal[]
+  assignedVisits  Visit[]
+  assignedTasks   Task[]
+  sentInvitations Invitation[]
+  activities      Activity[]
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId, role])
+}
+
+// Guardar HASH do token, nunca o token. Vazamento do banco nao deve
+// entregar convites validos. Mesma regra nas duas tabelas de token abaixo.
+model Invitation {
+  id                    String    @id @default(cuid()) @db.Char(25)
+  organizationId        String    @db.Char(25)
+  email                 String    @db.VarChar(191)
+  role                  Role
+  tokenHash             String    @unique @db.VarChar(191)
+  invitedByMembershipId String    @db.Char(25)
+  expiresAt             DateTime
+  acceptedAt            DateTime?
+  revokedAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invitedBy    Membership   @relation(fields: [invitedByMembershipId], references: [id], onDelete: Restrict)
+
+  // Ressalva: MySQL trata NULL como distinto, logo esta constraint NAO
+  // impede dois convites pendentes para o mesmo e-mail. A regra de um
+  // convite pendente por e-mail e aplicada na aplicacao.
+  @@unique([organizationId, email, acceptedAt])
+  @@index([invitedByMembershipId])
+  @@index([email])
+}
+
+// Sessao opaca: o cookie httpOnly carrega um token aleatorio; aqui fica
+// apenas o hash. Decisao de architecture.md ("sessao no servidor", nao JWT),
+// que e o que permite a suspensao de membro cortar o acesso na hora.
+model Session {
+  id                   String    @id @default(cuid()) @db.Char(25)
+  tokenHash            String    @unique @db.VarChar(191)
+  userId               String    @db.Char(25)
+  activeOrganizationId String?   @db.Char(25)
+  ipHash               String?   @db.VarChar(191)
+  userAgent            String?   @db.VarChar(255)
+  // Duas expiracoes distintas: absoluta e por inatividade.
+  expiresAt            DateTime
+  lastUsedAt           DateTime  @default(now())
+  revokedAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid()) @db.Char(25)
+  userId    String    @db.Char(25)
+  tokenHash String    @unique @db.VarChar(191)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid()) @db.Char(25)
+  userId    String    @db.Char(25)
+  tokenHash String    @unique @db.VarChar(191)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Tabela separada, fora de Membership (permissions.md §2.2).
+// Pode ficar para depois do MVP, mas precisa nascer separada.
+model PlatformAdmin {
+  id        String   @id @default(cuid()) @db.Char(25)
+  userId    String   @unique @db.Char(25)
+  note      String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  activities Activity[]
+}
+
+// ---------------------------------------------------------------------------
+// 3.2 Imoveis
+// ---------------------------------------------------------------------------
+
+enum PropertyType {
+  APARTMENT
+  HOUSE
+  LAND
+  COMMERCIAL
+  RURAL
+  OTHER
+}
+
+enum PropertyPurpose {
+  SALE
+  RENT
+  BOTH
+}
+
+enum PropertyStatus {
+  DRAFT
+  AVAILABLE
+  RESERVED
+  SOLD
+  RENTED
+  INACTIVE
+}
+
+enum AddressVisibility {
+  FULL
+  STREET_ONLY
+  NEIGHBORHOOD_ONLY
+}
+
+model Property {
+  id             String          @id @default(cuid()) @db.Char(25)
+  organizationId String          @db.Char(25)
+  // code e unico POR ORGANIZACAO, nao global: unicidade global vazaria
+  // informacao entre clientes.
+  code           String          @db.VarChar(191)
+  slug           String          @db.VarChar(191)
+  title          String          @db.VarChar(191)
+  description    String?         @db.Text
+  type           PropertyType
+  purpose        PropertyPurpose
+  // status e o estado comercial; publishedAt e visibilidade. Coisas distintas.
+  status         PropertyStatus  @default(DRAFT)
+
+  price     Decimal? @db.Decimal(12, 2)
+  rentPrice Decimal? @db.Decimal(12, 2)
+  condoFee  Decimal? @db.Decimal(12, 2)
+  iptu      Decimal? @db.Decimal(12, 2)
+
+  bedrooms     Int?
+  bathrooms    Int?
+  suites       Int?
+  parkingSpots Int?
+  areaTotal    Decimal? @db.Decimal(10, 2)
+  areaUseful   Decimal? @db.Decimal(10, 2)
+
+  state        String   @db.VarChar(2)
+  city         String   @db.VarChar(191)
+  neighborhood String   @db.VarChar(191)
+  zipCode      String?  @db.VarChar(16)
+  street       String?  @db.VarChar(191)
+  number       String?  @db.VarChar(32)
+  complement   String?  @db.VarChar(191)
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
+
+  // Padrao restritivo de proposito: se alguem esquecer de configurar,
+  // o endereco NAO vaza.
+  addressVisibility AddressVisibility @default(NEIGHBORHOOD_ONLY)
+
+  // Aponta para Membership, nunca para User (§3.3). Opcional porque o imovel
+  // pode nao ter responsavel; nesse caso so MANAGER para cima edita.
+  ownerMemberId String?   @db.Char(25)
+  publishedAt   DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  ownerMember  Membership?  @relation(fields: [ownerMemberId], references: [id], onDelete: Restrict)
+
+  media     PropertyMedia[]
+  features  PropertyFeature[]
+  inquiries Inquiry[]
+  deals     Deal[]
+  visits    Visit[]
+  tasks     Task[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, slug])
+  @@index([organizationId, status, publishedAt]) // lista do CRM
+  @@index([organizationId, ownerMemberId]) // "meus imoveis"
+  @@index([organizationId, city, neighborhood]) // filtro de busca
+  @@index([status, publishedAt]) // catalogo publico
+}
+
+// Em vez de vinte colunas booleanas: caracteristica nova vira uma linha,
+// nao uma migracao.
+model PropertyFeature {
+  id             String   @id @default(cuid()) @db.Char(25)
+  propertyId     String   @db.Char(25)
+  organizationId String   @db.Char(25)
+  feature        String   @db.VarChar(100)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, feature])
+  @@index([organizationId])
+}
+
+enum MediaKind {
+  PHOTO
+  FLOORPLAN
+  VIDEO
+  DOCUMENT
+}
+
+model PropertyMedia {
+  id             String    @id @default(cuid()) @db.Char(25)
+  organizationId String    @db.Char(25)
+  propertyId     String    @db.Char(25)
+  // Aponta para o object storage. Nenhum binario no MySQL.
+  objectKey      String    @db.VarChar(255)
+  // kind = DOCUMENT nunca e publico: matricula e contrato nao vao ao catalogo.
+  kind           MediaKind
+  position       Int
+  altText        String?   @db.VarChar(255)
+  // No maximo um true por imovel; garantido em transacao.
+  isCover        Boolean   @default(false)
+  width          Int?
+  height         Int?
+  byteSize       Int?
+  contentType    String?   @db.VarChar(100)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, position])
+  @@index([organizationId])
+  @@index([propertyId, kind])
+}
+
+// ---------------------------------------------------------------------------
+// 3.4 Comercial
+// ---------------------------------------------------------------------------
+
+enum LeadSource {
+  PUBLIC_CATALOG
+  MANUAL
+  IMPORT
+  REFERRAL
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  DISQUALIFIED
+  CONVERTED
+}
+
+model Lead {
+  id             String     @id @default(cuid()) @db.Char(25)
+  organizationId String     @db.Char(25)
+  fullName       String     @db.VarChar(191)
+  // Telefone e e-mail ambos opcionais, mas pelo menos um obrigatorio:
+  // validacao de aplicacao.
+  phone          String?    @db.VarChar(32)
+  email          String?    @db.VarChar(191)
+  source         LeadSource
+  // Nulo = fila de nao atribuidos. Nao e um estado separado; e a ausencia
+  // de responsavel. Menos uma coluna para dessincronizar.
+  assignedMemberId String?  @db.Char(25)
+  status           LeadStatus @default(NEW)
+  notes            String?    @db.Text
+
+  // LGPD: consentimento comprovavel. consentIpHash guarda HASH do IP.
+  consentGivenAt       DateTime?
+  privacyNoticeVersion String?   @db.VarChar(32)
+  consentIpHash        String?   @db.VarChar(191)
+
+  deletedAt    DateTime?
+  anonymizedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assignedMember Membership?  @relation(fields: [assignedMemberId], references: [id], onDelete: Restrict)
+
+  inquiries Inquiry[]
+  deals     Deal[]
+  visits    Visit[]
+  tasks     Task[]
+
+  @@index([organizationId, assignedMemberId, createdAt])
+  @@index([organizationId, assignedMemberId, status])
+  @@index([organizationId, phone]) // deteccao de duplicata (sem fusao automatica)
+}
+
+// A solicitacao concreta vinda do catalogo. Separada de Lead porque o mesmo
+// interessado pode perguntar sobre varios imoveis.
+model Inquiry {
+  id             String   @id @default(cuid()) @db.Char(25)
+  organizationId String   @db.Char(25)
+  propertyId     String   @db.Char(25)
+  leadId         String   @db.Char(25)
+  message        String?  @db.Text
+  sourceUrl      String?  @db.VarChar(255)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  // Imovel com Inquiry associada e soft delete, nunca fisico: a Inquiry e
+  // prova de origem do lead.
+  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, propertyId, createdAt])
+  @@index([leadId])
+}
+
+// Etapas em tabela, nao em enum: renomear etapa nao pode exigir ALTER TABLE.
+// No MVP existe apenas o seed de cinco etapas, sem tela de edicao.
+model PipelineStage {
+  id             String   @id @default(cuid()) @db.Char(25)
+  organizationId String   @db.Char(25)
+  name           String   @db.VarChar(100)
+  position       Int
+  isWon          Boolean  @default(false)
+  isLost         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  deals        Deal[]
+
+  @@unique([organizationId, position])
+}
+
+model Deal {
+  id               String    @id @default(cuid()) @db.Char(25)
+  organizationId   String    @db.Char(25)
+  leadId           String    @db.Char(25)
+  // Opcional: existe negociacao sem imovel definido.
+  propertyId       String?   @db.Char(25)
+  stageId          String    @db.Char(25)
+  assignedMemberId String?   @db.Char(25)
+  expectedAmount   Decimal?  @db.Decimal(12, 2)
+  closedAt         DateTime?
+  lostReason       String?   @db.VarChar(255)
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  // Visibilidade HERDA o lead (permissions.md §4.3): toda consulta a Deal
+  // precisa do mesmo escopo aplicado a Lead.
+  lead           Lead          @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  property       Property?     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  stage          PipelineStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  assignedMember Membership?   @relation(fields: [assignedMemberId], references: [id], onDelete: Restrict)
+
+  tasks Task[]
+
+  @@index([organizationId, stageId, assignedMemberId])
+  @@index([leadId])
+  @@index([propertyId])
+}
+
+enum VisitStatus {
+  SCHEDULED
+  CONFIRMED
+  DONE
+  CANCELED
+  NO_SHOW
+}
+
+model Visit {
+  id               String      @id @default(cuid()) @db.Char(25)
+  organizationId   String      @db.Char(25)
+  propertyId       String      @db.Char(25)
+  leadId           String?     @db.Char(25)
+  assignedMemberId String      @db.Char(25)
+  // DATETIME em UTC, convertido na borda.
+  startsAt         DateTime
+  endsAt           DateTime
+  status           VisitStatus @default(SCHEDULED)
+  notes            String?     @db.Text
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  property       Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  assignedMember Membership   @relation(fields: [assignedMemberId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, assignedMemberId, startsAt])
+  @@index([propertyId])
+  @@index([leadId])
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+  CANCELED
+}
+
+model Task {
+  id               String     @id @default(cuid()) @db.Char(25)
+  organizationId   String     @db.Char(25)
+  leadId           String?    @db.Char(25)
+  dealId           String?    @db.Char(25)
+  propertyId       String?    @db.Char(25)
+  assignedMemberId String     @db.Char(25)
+  title            String     @db.VarChar(191)
+  dueAt            DateTime?
+  status           TaskStatus @default(OPEN)
+  completedAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  deal           Deal?        @relation(fields: [dealId], references: [id], onDelete: Restrict)
+  property       Property?    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  assignedMember Membership   @relation(fields: [assignedMemberId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, assignedMemberId, status, dueAt])
+  @@index([leadId])
+  @@index([dealId])
+  @@index([propertyId])
+}
+
+// ---------------------------------------------------------------------------
+// 3.5 Auditoria
+// ---------------------------------------------------------------------------
+
+// SOMENTE INSERCAO. Nenhum papel edita (permissions.md §4.6).
+// Um dos dois atores pode ser nulo; ambos nulos significa acao do sistema.
+model Activity {
+  id                   String   @id @default(cuid()) @db.Char(25)
+  organizationId       String   @db.Char(25)
+  actorMembershipId    String?  @db.Char(25)
+  actorPlatformAdminId String?  @db.Char(25)
+  entityType           String   @db.VarChar(64)
+  entityId             String   @db.Char(25)
+  action               String   @db.VarChar(64)
+  // JSON evita uma tabela por tipo de evento. Aceitavel porque nao se
+  // consulta por dentro dele, so se exibe.
+  metadata             Json?
+  ipHash               String?  @db.VarChar(191)
+  createdAt            DateTime @default(now())
+
+  organization       Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actorMembership    Membership?    @relation(fields: [actorMembershipId], references: [id], onDelete: Restrict)
+  actorPlatformAdmin PlatformAdmin? @relation(fields: [actorPlatformAdminId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, entityType, entityId, createdAt])
+  @@index([actorMembershipId])
+  @@index([actorPlatformAdminId])
+}

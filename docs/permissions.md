@@ -209,6 +209,21 @@ A API consome para autorizar; o frontend consome para esconder botões. **Escond
 
 Vantagem de ser dado: a matriz vira uma tabela que você lê em dez segundos, e o teste a percorre inteira automaticamente, em vez de alguém escrever 60 testes à mão e esquecer quatro.
 
+### Onde vive, de fato — implementado em 20/10/2026
+
+| Passo do §6 | Onde |
+|---|---|
+| 4 (papel × ação) | `packages/shared/src/permissoes.ts` — `podeFazer()`, consumido pela API e pelo site |
+| 1 a 4 | `apps/api/src/autorizacao/autorizacao.guard.ts`, declarada por rota com `@Exige('acao')` |
+| 5 a 7 | `apps/api/src/autorizacao/autorizacao.service.ts` — `conferir()` e `registrar()` |
+
+Duas decisões que o código tomou e que este documento não previa:
+
+1. **Rota com a guarda e sem `@Exige` responde 403.** Esquecer a declaração é erro de programação; abrir por omissão faria o esquecimento virar rota pública.
+2. **O 403-ou-404 do passo 6 sai da própria matriz, não de uma lista escrita à mão.** Quando a atribuição não bate, a recusa esconde o registro (404) se o papel lê apenas os próprios daquele recurso, e o admite (403) se o papel lê todos os da organização. É exatamente a diferença que o §8.3 descreve entre imóvel e lead para o mesmo `AGENT`, e derivá-la da matriz significa que um recurso novo herda o comportamento certo sem ninguém decidir de novo.
+
+A guarda **não** é registrada como `APP_GUARD` global, de propósito: isso exigiria marcar como pública cada rota que não autentica (catálogo, health, login), e essa lista de exceções é o lugar clássico onde se esquece de tirar uma rota.
+
 ---
 
 ## 8. Plano de testes de isolamento
@@ -247,6 +262,10 @@ Para **cada** endpoint de leitura, escrita e exclusão, autenticado como `agent_
 - trocar para B muda o resultado imediatamente, sem resquício de cache
 - enviar `organizationId` de B no corpo da requisição, com A ativa, **não** muda o resultado
 - membership com `status != ACTIVE` perde acesso imediatamente
+
+**Coberto em 20/10/2026** pelos quatro cenários, em `apps/api/test/autorizacao/autorizacao.http.spec.ts` e `apps/api/test/autenticacao/organizacao-ativa.http.spec.ts`.
+
+Há **um** endpoint que lê `organizationId` do cliente — `POST /autenticacao/organizacao-ativa` —, e a distinção que o mantém seguro é que ali o identificador é um **pedido**, não uma declaração: o servidor confere o `Membership` ativo antes de gravar na sessão. Ele recusa com 404, nunca 403, e com o mesmo corpo para organização sem vínculo, com vínculo suspenso, suspensa e inexistente. Um 403 aqui transformaria o endpoint em consultor de existência de organizações para quem tivesse qualquer conta, porque ele aceita identificador arbitrário por natureza.
 
 ### 8.5 Catálogo público
 

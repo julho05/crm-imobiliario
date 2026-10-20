@@ -1,0 +1,32 @@
+{
+  // O tsconfig.json da API tem `include: ["src/**/*"]`, para que nada de teste
+  // entre no `dist/`. O efeito colateral era que `test/` ficava fora de duas
+  // coisas:
+  //
+  // 1. **Verificacao de tipos.** `tsc --noEmit` nunca olhava esta pasta.
+  // 2. **Decoradores.** O transformador do Vitest procura o `tsconfig.json`
+  //    mais proximo do arquivo para saber se `experimentalDecorators` esta
+  //    ligado. Sem nenhum aqui, um controller de teste com `@Req()` falhava ao
+  //    ser carregado, com "Decorators are not valid here" — e o erro aparecia
+  //    como falha de suite, nao como erro de configuracao.
+  //
+  // Precisa chamar-se `tsconfig.json`, e nao `tsconfig.test.json` como em
+  // `packages/shared`: o transformador so procura o nome exato.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // Os arquivos de teste ficam fora de `src/`, que e o rootDir da API.
+    // Irrelevante sem emissao, mas explicito evita surpresa.
+    "rootDir": "..",
+    // Quem carrega estes arquivos e o Vitest, como ESM — nao o `tsc`, que
+    // nunca os emite. Com o `nodenext` herdado da API, o TypeScript os trata
+    // como CommonJS (a API nao declara `"type": "module"`) e recusa o
+    // `import.meta` que o `setup-global.ts` usa para achar o CLI do Prisma.
+    // Descrever o carregamento real resolve sem mexer na configuracao da API.
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    // Cache separado do build principal, que usa o mesmo caminho padrao.
+    "incremental": false
+  },
+  "include": ["**/*"]
+}

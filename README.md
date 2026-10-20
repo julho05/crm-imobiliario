@@ -71,15 +71,28 @@ O que **não** sincroniza entre máquinas: o `.env` (cada uma tem as suas senhas
 | `npm run db:up` | Liga o MySQL |
 | `npm run db:down` | Desliga o MySQL |
 | `npm run db:logs` | Mostra os logs do banco |
+| `npm run db:migrate` | Cria e aplica migration a partir do schema |
+| `npm run db:status` | Mostra quais migrations o banco já tem |
+| `npm run db:generate` | Regera o client do Prisma |
+| `npm run db:studio` | Abre o navegador de dados do Prisma |
+| `npm run db:drift` | Confere se o banco bate com as migrations |
+| `npm run verify` | Lint + formatação + tipos + testes, tudo de uma vez |
+| `npm run lint` | Procura problemas no código |
+| `npm run format` | Formata o código |
+| `npm run typecheck` | Confere os tipos |
+| `npm run test` | Roda os testes |
 
 ## Estrutura
 
 ```
 apps/
   api/        NestJS — regras de negócio e API REST
+    prisma/   schema e migrations
   web/        Next.js — painel do CRM e catálogo público
+    components/ui/   componentes do shadcn/ui
 packages/
-  shared/     tipos e validações compartilhados
+  shared/     enums, matriz de permissões e validações compartilhadas
+docker/       scripts de inicialização do MySQL de desenvolvimento
 docs/         documentação de produto e arquitetura
 ```
 
@@ -91,14 +104,23 @@ docs/         documentação de produto e arquitetura
 | [docs/permissions.md](docs/permissions.md) | Papéis, permissões e isolamento multi-tenant |
 | [docs/data-model.md](docs/data-model.md) | Entidades, índices e LGPD |
 | [docs/architecture.md](docs/architecture.md) | Arquitetura e decisões de fundação |
-| [docs/design-system.md](docs/design-system.md) | Cores, princípios e telas |
-| [docs/roadmap.md](docs/roadmap.md) | Fases do MVP |
+| [docs/design-system.md](docs/design-system.md) | Cores, contraste medido, tokens e tema |
+| [docs/pages-and-navigation.md](docs/pages-and-navigation.md) | Rotas, permissões por papel, fluxos e estados |
+| [docs/roadmap.md](docs/roadmap.md) | Fases do MVP, critérios de aceitação e definição de pronto |
 
 ## Estado atual
 
 **Fase 1 — fundação.** O esqueleto está de pé: monorepo, MySQL em container, API e site subindo e conversando entre si.
 
-Ainda **não** existem: tabelas no banco, schema do Prisma, autenticação, organizações ou telas de verdade.
+O banco tem estrutura: o schema do Prisma traduz o [modelo de dados](docs/data-model.md) em
+19 tabelas, aplicadas pela migration inicial. O `GET /health` da API consulta o banco de verdade.
+
+Também já existem o design system (Tailwind + shadcn/ui com as cores oficiais, tema claro e escuro),
+os contratos compartilhados em `packages/shared` (enums, matriz de permissões e validações) e a
+rede de verificação: lint, formatação, tipos, testes e CI.
+
+Ainda **não** existem: autenticação, organizações, seed de dados ou telas de produto.
+O próximo passo e seus critérios de aceitação estão no [roadmap](docs/roadmap.md).
 
 ## Segurança
 

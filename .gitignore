@@ -38,3 +38,6 @@ desktop.ini
 # Gerado automaticamente pelo Next.js a cada "next dev"
 AGENTS.md
 apps/*/AGENTS.md
+
+# Client do Prisma — gerado por "prisma generate", que roda no dev e no build
+apps/api/src/generated/

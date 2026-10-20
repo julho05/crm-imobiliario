@@ -1,0 +1,13 @@
+node_modules
+dist
+.next
+coverage
+package-lock.json
+apps/api/src/generated
+apps/api/prisma/migrations
+AGENTS.md
+
+# Documentacao e composes ficam fora: as tabelas e os comentarios sao
+# escritos a mao, e reflui-los esconderia mudanca real no diff.
+*.md
+docker-compose.yml

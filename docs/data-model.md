@@ -357,3 +357,71 @@ Note que `(organizationId, assignedMemberId, …)` aparece em quase tudo: é o r
 | 7 | A ação de *unificar* leads duplicados entra no MVP, ou basta o aviso? | Captura de lead |
 
 Nenhuma das duas bloqueia a Fase 1 do [roadmap.md](roadmap.md).
+
+---
+
+## 10. Implementação — 20/10/2026
+
+O schema do Prisma existe e a migration inicial foi aplicada. Este documento
+deixa de ser apenas desenho: `apps/api/prisma/schema.prisma` o implementa, e
+`apps/api/prisma/migrations/` guarda o SQL versionado.
+
+**19 tabelas criadas**, exatamente as entidades das seções 3.1 a 3.5, mais o
+`_prisma_migrations` de controle. As convenções da §1 e os índices da §6 foram
+aplicados como escritos.
+
+### O que mudou em relação ao desenho
+
+| Mudança | Motivo |
+|---|---|
+| Nasce a tabela **`Session`** | Não estava nas entidades. A decisão de sessão opaca no servidor ([architecture.md](architecture.md)) exige estado no MySQL: `tokenHash` único, `userId`, `activeOrganizationId`, expiração absoluta e `lastUsedAt` para a expiração por inatividade |
+| **`PlatformAdmin`** com `userId` único | Uma pessoa não é administradora de plataforma duas vezes |
+| Tabelas de token com `onDelete: Cascade` | `Session`, `PasswordResetToken` e `EmailVerificationToken` apontam para `User`. Apagar a conta deve levar os tokens embora — ao contrário de `Membership`, que é `Restrict` por exigência de [permissions.md](permissions.md) §4.4 |
+
+### Enums implementados
+
+`Organization.plan` nasceu com `FREE` e `PRO` apenas. A §3.1 escrevia
+`(FREE|PRO|…)`; os planos reais só serão definidos antes da venda, e cada valor
+novo é um `ALTER TABLE` (§8). Dois valores bastam para o MVP.
+
+### Índices implícitos do MySQL
+
+O MySQL cria automaticamente um índice para toda coluna de chave estrangeira
+que não seja a primeira de um índice composto. São sete, nomeados `*_fkey`:
+em `Deal` (`stageId`, `assignedMemberId`), `Inquiry` (`propertyId`),
+`Lead` (`assignedMemberId`), `Property` (`ownerMemberId`),
+`Task` e `Visit` (`assignedMemberId`).
+
+**Não declará-los no schema é deliberado.** Declarar gera um índice duplicado
+com nome diferente, e nenhum ganho: o índice já existe. Consequência prática:
+`prisma migrate diff --from-schema` sempre vai reportá-los como diferença, e
+isso **não** é desvio. A verificação correta é contra as migrations:
+
+```bash
+npm run db:drift   # migrate diff --from-migrations ... --exit-code
+```
+
+Esse é o comando que serve ao teste de CI proposto na §8. Hoje devolve
+"No difference detected".
+
+### Verificado em 20/10/2026
+
+| Critério | Resultado |
+|---|---|
+| `prisma validate` | schema válido |
+| `prisma migrate status` | 1 migration, banco em dia |
+| `npm run db:drift` | sem diferença entre migrations e banco |
+| Tabelas em `crm_dev` | 19 + `_prisma_migrations` |
+| `GET /health` | `{"status":"ok","database":"ok"}` |
+
+### Pendências que este passo não resolveu
+
+- **Nenhuma validação de aplicação foi escrita.** As regras que o banco não
+  expressa continuam apenas documentadas: um `OWNER` ativo por organização,
+  um `isCover` por imóvel, `purpose = BOTH` exigindo os dois preços, lead com
+  telefone **ou** e-mail, e a consistência do `organizationId` redundante.
+- **A unicidade de `Invitation`** `(organizationId, email, acceptedAt)` não
+  impede dois convites pendentes: o MySQL trata `NULL` como distinto. Precisa
+  ser garantida na aplicação.
+- **O seed das cinco etapas do funil** (§3.4) ainda não existe.
+- **O teste que varre divergência de `organizationId`** (§8) ainda não existe.

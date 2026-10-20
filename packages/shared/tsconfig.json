@@ -2,15 +2,26 @@
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    // nodenext sem "type": "module" no package.json emite CommonJS, que e o
+    // que o NestJS consome. O Next empacota CommonJS sem problema.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "strict": true,
+    // O tsc emite mesmo com erro de tipo. Sem isto, um build que falha
+    // deixa um dist/ parcial que o consumidor importa como se estivesse
+    // bom — confirmado na pratica ao testar a divergencia de enums.
+    "noEmitOnError": true,
     "declaration": true,
-    "noEmit": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    // O pacote e compilado para dist/. Sem isso, o "nest build" do apps/api
+    // falharia ao importar TypeScript cru de fora do seu rootDir.
+    "rootDir": "./src",
+    "outDir": "./dist",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
 }

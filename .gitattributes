@@ -1,0 +1,19 @@
+# Normaliza quebras de linha. O motivo concreto: esta maquina tem
+# core.autocrlf=true, e um script .sh entregue com CRLF ao container do MySQL
+# falha com "bad interpreter". Fixar aqui vale para qualquer maquina do time,
+# independente da configuracao local do Git.
+* text=auto eol=lf
+
+# Scripts executados dentro de containers Linux: nunca CRLF.
+*.sh text eol=lf
+
+# Arquivos que o Git nao deve tentar normalizar.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
