@@ -99,6 +99,15 @@ Públicas, sem sessão, e **versionadas**. O aviso de privacidade guarda número
 
 ## 4. Autenticação
 
+> **Construído em 20/10/2026.** As cinco telas existem em `apps/web/app/(entrada)/`, ligadas à API dos itens A1 a A10 do [roadmap.md](roadmap.md). Verificado ponta a ponta pelo navegador: cadastro, login, logout, recuperação de senha com uso único do token, e convite aceito criando conta.
+>
+> Duas coisas que o documento não previa e o código decidiu:
+>
+> - **`/entrar` recusa destino externo.** O parâmetro `?destino=` só aceita caminho que começa com uma barra. Sem isso, `?destino=https://site-falso/...` faria o próprio login redirecionar para fora — um redirecionamento aberto, que serve para dar aparência legítima a página de phishing.
+> - **`/termos` e `/privacidade` existem, mas sem texto.** Declaram que o documento está em elaboração. Texto jurídico improvisado criaria aparência de proteção que não existe e invalidaria o consentimento que o banco registra em `privacyNoticeVersion`. Depende do item D6.
+>
+> Ainda **não** construído: o campo de `slug` não verifica disponibilidade enquanto a pessoa digita. Ele valida formato e recusa os reservados de `@app/shared`, e a colisão aparece como erro ao enviar. A verificação ao vivo exige um endpoint que não existe.
+
 ### `/entrar`
 
 Campos: e-mail e senha, com "permanecer conectado". Contrato: `loginSchema` em `@app/shared`.
@@ -107,7 +116,7 @@ Campos: e-mail e senha, com "permanecer conectado". Contrato: `loginSchema` em `
 |---|---|
 | Credencial errada | **"E-mail ou senha incorretos."** Nunca "este e-mail não existe": isso entrega quais e-mails têm conta na plataforma |
 | Conta desabilitada | Mensagem genérica, idêntica à anterior, pelo mesmo motivo |
-| E-mail não verificado | **[DECIDIR]** Bloqueia o login ou entra com aviso e acesso limitado? **Proponho entrar com aviso**: bloquear no primeiro acesso, dependendo de e-mail que pode cair em spam, é a forma mais rápida de perder o cliente recém-cadastrado |
+| E-mail não verificado | **[DECIDIDO 20/10/2026] Não bloqueia.** Bloquear o primeiro acesso, dependendo de um e-mail que pode cair em spam, é a forma mais rápida de perder o cliente recém-cadastrado. Nada no MVP depende da confirmação, e há teste garantindo que a conta não verificada usa o sistema |
 | Muitas tentativas | Mensagem de limite atingido. Rate limiting é exigência do [CLAUDE.md](../CLAUDE.md) |
 
 ### `/cadastro`
