@@ -1,0 +1,32 @@
+{
+  // O `tsconfig.json` da API tem `include: ["src/**/*"]`, para que nada fora de
+  // `src/` entre no `dist/`. O efeito colateral e o mesmo que `test/` sofreu:
+  // o `seed.ts` ficaria **fora da verificacao de tipos**, e um erro nele so
+  // apareceria na hora de rodar o comando — que e justamente a hora em que
+  // alguem esta tentando popular o banco e nao quer depurar TypeScript.
+  //
+  // Por isso este arquivo existe, e por isso o script `typecheck` da API o
+  // inclui.
+  //
+  // Diferente de `test/tsconfig.json`, aqui **ha emissao**: o seed e executado
+  // pelo Node, nao pelo Vitest, e a API e CommonJS. A saida vai para
+  // `dist-seed/`, e nao `dist/`, por um motivo concreto — o `nest build` apaga
+  // e recria o `dist/`, e compartilhar a pasta faria um build apagar o seed
+  // compilado (ou o contrario).
+  // `rootDir` e `..`, e nao `prisma/`, porque o seed importa o client gerado
+  // do Prisma, que vive em `src/generated/`. O TypeScript exige que o rootDir
+  // contenha todo arquivo de origem, entao o client e compilado junto — 2,5s e
+  // 327 KB, medidos, o que e mais barato do que as alternativas (depender do
+  // `nest build`, ou duplicar o seed em JavaScript sem verificacao de tipo).
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "outDir": "../dist-seed",
+    // O `tsc` emite arquivos mesmo quando falha com erro de tipo, o que
+    // deixaria um seed parcial com aparencia de valido — a mesma armadilha que
+    // `packages/shared` encontrou.
+    "noEmitOnError": true,
+    "incremental": false
+  },
+  "include": ["seed.ts"]
+}

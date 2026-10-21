@@ -5,8 +5,11 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff, Trash2 } from 'lucide-react';
 import {
+  ESTADOS_COMERCIAIS_ALCANCAVEIS,
+  estadoIncompativelComAFinalidade,
   podeFazer,
   ROTULOS_DE_STATUS_DE_IMOVEL,
+  type EstadoComercialAlcancavel,
   type Escopo,
 } from '@app/shared';
 import { Aviso } from '@/components/aviso';
@@ -193,6 +196,15 @@ export default function EditarImovel() {
           }}
         />
 
+        <EstadoComercial
+          imovel={imovel}
+          pode={podeEditar}
+          aoMudar={(atualizado) => {
+            setSalvo(false);
+            setEstado({ situacao: 'pronto', imovel: atualizado });
+          }}
+        />
+
         {podeEditar ? (
           <FormularioDeImovel imovel={imovel} />
         ) : (
@@ -324,6 +336,111 @@ function Publicacao({
             Seu papel nao permite publicar este imovel.
           </p>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Estado comercial: disponivel, reservado, vendido, alugado, arquivado.
+ *
+ * ## Por que botoes, e nao um seletor
+ *
+ * Porque cada um e um **acontecimento**, nao a escolha de um valor. "Marquei
+ * como vendido" e uma data que alguem vai consultar depois, e a API grava um
+ * evento de auditoria com nome proprio para cada um. Um seletor com "salvar"
+ * faria a mudanca parecer edicao de campo, e convidaria a troca por engano em
+ * algo que mexe no anuncio publico.
+ *
+ * O texto avisa quando a mudanca tira o imovel do ar, porque essa consequencia
+ * nao e obvia e nao da para desfazer com um clique — republicar e outra acao.
+ */
+function EstadoComercial({
+  imovel,
+  pode,
+  aoMudar,
+}: {
+  imovel: Imovel;
+  pode: boolean;
+  aoMudar: (imovel: Imovel) => void;
+}) {
+  const [agindo, setAgindo] = useState<string | null>(null);
+  const [falha, setFalha] = useState<string | null>(null);
+
+  async function alterar(estado: EstadoComercialAlcancavel) {
+    setAgindo(estado);
+    setFalha(null);
+
+    try {
+      const atualizado = await chamarApi<Imovel>(
+        `/imoveis/${imovel.id}/estado`,
+        { metodo: 'POST', corpo: { estado } },
+      );
+
+      aoMudar(atualizado);
+    } catch (erro) {
+      setFalha(
+        erro instanceof ErroDaApi
+          ? // A API recusa vender imovel so de locacao, alugar imovel so de
+            // venda, e voltar a disponivel sem o preco da finalidade. As
+            // mensagens dela sao especificas e uteis aqui.
+            erro.message
+          : 'Nao foi possivel mudar o estado do imovel.',
+      );
+    } finally {
+      setAgindo(null);
+    }
+  }
+
+  // Esconde o que a finalidade nao admite, em vez de oferecer e recusar: o
+  // imovel so de locacao nao tem como ser vendido.
+  const disponiveis = ESTADOS_COMERCIAIS_ALCANCAVEIS.filter(
+    (estado) =>
+      estado !== imovel.status &&
+      estadoIncompativelComAFinalidade(estado, imovel.finalidade) === null,
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Estado comercial</CardTitle>
+        <CardDescription>
+          Hoje: <strong>{ROTULOS_DE_STATUS_DE_IMOVEL[imovel.status]}</strong>. E
+          diferente da publicacao — um imovel reservado continua anunciado, com
+          etiqueta.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {falha ? <Aviso tom="erro">{falha}</Aviso> : null}
+
+        {pode ? (
+          <div className="flex flex-wrap gap-2">
+            {disponiveis.map((estado) => (
+              <Button
+                key={estado}
+                variant="outline"
+                size="sm"
+                disabled={agindo !== null}
+                onClick={() => void alterar(estado)}
+              >
+                {agindo === estado
+                  ? 'Aguarde...'
+                  : ROTULOS_DE_STATUS_DE_IMOVEL[estado]}
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Seu papel nao permite mudar o estado deste imovel.
+          </p>
+        )}
+
+        {pode && imovel.publicadoEm ? (
+          <p className="text-muted-foreground text-xs">
+            Marcar como vendido, alugado ou arquivado tira o imovel do catalogo
+            publico.
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );

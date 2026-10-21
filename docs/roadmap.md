@@ -124,7 +124,14 @@ Entraram junto com o B2, em `apps/web/app/painel/`:
 - **Formulário** de cadastro e edição em cinco seções, com o controle de `addressVisibility` visível e explicado, e o aviso no campo de descrição quando o endereço não é `FULL`
 - **Publicar e tirar do ar**, e exclusão com confirmação em duas etapas
 
-O que **não** entrou: fotos (B4, depende do armazenamento de objetos) e mudança de estado comercial para `RESERVED`, `SOLD` ou `RENTED` — hoje o estado só vai de `DRAFT` para `AVAILABLE`, na publicação. Sem isso o item C1 do catálogo não tem como mostrar a etiqueta de reservado, e a tarefa precisa de dono: ver as pendências no fim deste documento.
+### Estado comercial e seed — **concluído em 21/10/2026**
+
+Duas pontas soltas, fechadas no mesmo dia:
+
+- **Estado comercial** (`POST /imoveis/:id/estado`): disponível, reservado, vendido, alugado e arquivado, cada um com evento de auditoria próprio — `imovel.vendido`, não um `estadoAlterado` genérico, porque a pergunta que se faz ao histórico é "quando foi vendido?". `DRAFT` não é destino aceito: voltar a rascunho confundiria "não terminei de cadastrar" com "não quero mais anunciar", e a segunda é a rota de despublicar. Vendido, alugado e arquivado **saem do catálogo**; reservado continua no ar, porque o item C1 o mostra com etiqueta
+- **Seed de desenvolvimento** (`npm run db:seed`): três organizações — uma imobiliária com cinco papéis e 26 imóveis, outra com dois, e um corretor autônomo —, com imóveis nos seis estados, alguns sem responsável e alguns sem área, mais uma pessoa com vínculo em duas organizações. Tem três guardas, todas verificadas: recusa `NODE_ENV=production`, recusa banco que não se chame `crm_dev` e recusa host que não seja local
+
+O que **não** entrou: fotos (B4, depende do armazenamento de objetos).
 
 **Verificação.** A API tem 421 testes. As telas foram conferidas por tipo, lint e build, e o percurso cadastro → imóvel → publicação foi exercitado contra o servidor em execução. **Não há teste de componente no site** — decisão de 21/10/2026, para não acrescentar `@testing-library/react` e `jsdom` agora. A consequência é concreta: a lógica do formulário (erro por campo, preço por finalidade, vazio que apaga na edição) não tem rede de proteção automatizada.
 
@@ -176,7 +183,6 @@ Um corretor entra, cadastra e publica imóvel, recebe lead do catálogo, agenda 
 | Armazenamento de objetos | B4 | Responsável (tem custo) |
 | ~~Campos obrigatórios do imóvel~~ | ~~B1~~ | **Decidido em 21/10/2026**: piso do banco mais preço coerente com a finalidade. Ver `packages/shared/src/schemas/imovel.ts` |
 | Unificar leads duplicados no MVP | B5 | Responsável |
-| Estado comercial do imóvel (`RESERVED`, `SOLD`, `RENTED`) — onde entra? | C1 (etiqueta de reservado) | Responsável. O B1 e o B2 não cobrem: publicar leva `DRAFT` a `AVAILABLE` e nada mais muda o estado |
 | Mecanismo anti-spam | C6 | Responsável (custo e LGPD) |
 | Parecer jurídico sobre anonimização | D6, piloto | Advogado — **não é decisão técnica** |
 | Marca verificada no INPI e Registro.br | Qualquer uso público | Responsável |

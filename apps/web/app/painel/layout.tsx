@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LogOut, Menu, X } from 'lucide-react';
+import { ArrowRight, LogOut, Menu, X } from 'lucide-react';
+import { ROTULOS_DE_PAPEL } from '@app/shared';
 import { AlternadorDeTema } from '@/components/alternador-de-tema';
 import { Aviso } from '@/components/aviso';
 import { Navegacao } from '@/components/painel/navegacao';
@@ -56,6 +57,9 @@ const nomeDoApp = process.env.NEXT_PUBLIC_APP_NAME ?? 'CRM';
 type Estado =
   | { situacao: 'carregando' }
   | { situacao: 'pronto'; eu: Eu; organizacoes: Organizacao[] }
+  /** Tem vinculo em mais de uma organizacao e ainda nao escolheu qual usar. */
+  | { situacao: 'escolher-organizacao'; organizacoes: Organizacao[] }
+  /** Nao tem vinculo ativo em nenhuma organizacao. */
   | { situacao: 'sem-organizacao' }
   | { situacao: 'erro'; mensagem: string };
 
@@ -97,16 +101,33 @@ export default function LayoutDoPainel({
           return;
         }
 
-        // Sessao valida sem organizacao ativa e estado real, nao erro: acontece
-        // a quem teve o unico vinculo suspenso. A API responderia 403 em toda
-        // rota de dado, e uma tela de erro generico nao diria o porque.
-        const ativaExiste = lista.organizacoes.some((o) => o.ativa);
-
-        setEstado(
-          ativaExiste
-            ? { situacao: 'pronto', eu, organizacoes: lista.organizacoes }
-            : { situacao: 'sem-organizacao' },
-        );
+        // Sessao valida sem organizacao ativa e estado real, nao erro — e sao
+        // **dois** estados diferentes, que precisam de telas diferentes:
+        //
+        // - **nenhum vinculo**: quem teve o unico vinculo suspenso. Nao ha o
+        //   que escolher, e so quem administra a equipe resolve.
+        // - **vinculo em varias, nenhuma escolhida**: a API devolve `null` de
+        //   proposito quando a pessoa tem mais de um vinculo e nao ha
+        //   preferencia anterior, porque `CLAUDE.md` exige que a organizacao
+        //   ativa seja escolhida explicitamente. Aqui a pessoa escolhe.
+        //
+        // Tratar os dois como um so dizia "sua conta nao esta ativa em nenhuma
+        // organizacao" a quem tem duas — e deixava a pessoa sem saida numa
+        // tela que a culpava por um passo que ela nunca teve como dar.
+        if (lista.organizacoes.some((o) => o.ativa)) {
+          setEstado({
+            situacao: 'pronto',
+            eu,
+            organizacoes: lista.organizacoes,
+          });
+        } else if (lista.organizacoes.length > 0) {
+          setEstado({
+            situacao: 'escolher-organizacao',
+            organizacoes: lista.organizacoes,
+          });
+        } else {
+          setEstado({ situacao: 'sem-organizacao' });
+        }
       } catch (erro) {
         if (!ativo) {
           return;
@@ -187,6 +208,18 @@ export default function LayoutDoPainel({
             </Button>
           </div>
         </div>
+      </MolduraSimples>
+    );
+  }
+
+  if (estado.situacao === 'escolher-organizacao') {
+    return (
+      <MolduraSimples>
+        <EscolhaDeOrganizacao
+          organizacoes={estado.organizacoes}
+          aoEscolher={trocarOrganizacao}
+          aoSair={sair}
+        />
       </MolduraSimples>
     );
   }
@@ -292,6 +325,103 @@ export default function LayoutDoPainel({
         </main>
       </div>
     </ProvedorDaSessao>
+  );
+}
+
+/**
+ * Escolha da organizacao ativa, para quem tem mais de um vinculo.
+ *
+ * Aparece no lugar do painel, e nao dentro dele, porque **nenhuma** tela de
+ * dado funciona antes dessa escolha: a guarda da API recusa toda rota
+ * autenticada sem organizacao ativa. Mostrar o painel vazio com um aviso faria
+ * a pessoa clicar em itens que respondem erro.
+ *
+ * E a escolha explicita que `CLAUDE.md` exige. Adivinhar — pegar a primeira da
+ * lista — seria mais rapido e erraria calado: a pessoa comecaria a trabalhar
+ * achando que esta numa organizacao e estaria em outra.
+ */
+function EscolhaDeOrganizacao({
+  organizacoes,
+  aoEscolher,
+  aoSair,
+}: {
+  organizacoes: Organizacao[];
+  aoEscolher: (organizationId: string) => Promise<void>;
+  aoSair: () => Promise<void>;
+}) {
+  const [escolhendo, setEscolhendo] = useState<string | null>(null);
+  const [falha, setFalha] = useState<string | null>(null);
+
+  async function escolher(organizationId: string) {
+    setEscolhendo(organizationId);
+    setFalha(null);
+
+    try {
+      await aoEscolher(organizationId);
+    } catch {
+      setFalha('Nao foi possivel entrar nessa organizacao. Tente de novo.');
+      setEscolhendo(null);
+    }
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div>
+        <h1 className="text-navy text-xl font-semibold tracking-tight dark:text-foreground">
+          Escolha a organizacao
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Voce participa de mais de uma. Depois e possivel trocar pelo menu, a
+          qualquer momento.
+        </p>
+      </div>
+
+      {falha ? <Aviso tom="erro">{falha}</Aviso> : null}
+
+      <ul className="grid gap-2">
+        {organizacoes.map((organizacao) => (
+          <li key={organizacao.organizationId}>
+            <button
+              type="button"
+              disabled={escolhendo !== null}
+              onClick={() => void escolher(organizacao.organizationId)}
+              className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-60"
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-medium">
+                  {organizacao.nome}
+                </span>
+                <span className="text-muted-foreground block text-xs">
+                  {ROTULOS_DE_PAPEL[organizacao.papel]}
+                </span>
+              </span>
+
+              {escolhendo === organizacao.organizationId ? (
+                <span className="text-muted-foreground text-xs">
+                  Entrando...
+                </span>
+              ) : (
+                <ArrowRight
+                  aria-hidden="true"
+                  className="size-4 shrink-0 opacity-60"
+                />
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={escolhendo !== null}
+          onClick={() => void aoSair()}
+        >
+          Sair
+        </Button>
+      </div>
+    </div>
   );
 }
 

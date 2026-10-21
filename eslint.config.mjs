@@ -14,6 +14,10 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
+      // Saida compilada do seed. Pasta separada do `dist/` de proposito: o
+      // `nest build` apaga e recria aquele, e compartilhar faria um apagar o
+      // outro (ver apps/api/prisma/tsconfig.json).
+      '**/dist-seed/**',
       '**/.next/**',
       '**/coverage/**',
       // Gerado pelo Prisma: nao e nosso codigo e nao passa no lint.

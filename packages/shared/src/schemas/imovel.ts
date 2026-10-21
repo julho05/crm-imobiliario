@@ -34,7 +34,12 @@
  */
 
 import { z } from 'zod';
-import { AddressVisibility, PropertyPurpose, PropertyType } from '../enums';
+import {
+  AddressVisibility,
+  PropertyPurpose,
+  PropertyStatus,
+  PropertyType,
+} from '../enums';
 import { ufSchema } from '../primitivos';
 
 /**
@@ -281,3 +286,56 @@ export const filtrosDeImoveisSchema = z.object({
     .optional(),
 });
 export type FiltrosDeImoveis = z.infer<typeof filtrosDeImoveisSchema>;
+
+/**
+ * Estados que a rota de estado comercial aceita como destino.
+ *
+ * `DRAFT` fica **fora** de proposito. Voltar um imovel publicado a rascunho
+ * confundiria duas coisas: "ainda nao terminei de cadastrar" e "nao quero mais
+ * anunciar". A segunda e a rota de despublicar, que preserva o estado — e e o
+ * que a pessoa quer em 100% dos casos em que pensaria em voltar para rascunho.
+ */
+export const ESTADOS_COMERCIAIS_ALCANCAVEIS = [
+  PropertyStatus.AVAILABLE,
+  PropertyStatus.RESERVED,
+  PropertyStatus.SOLD,
+  PropertyStatus.RENTED,
+  PropertyStatus.INACTIVE,
+] as const;
+
+export type EstadoComercialAlcancavel =
+  (typeof ESTADOS_COMERCIAIS_ALCANCAVEIS)[number];
+
+/** Mudanca de estado comercial do imovel. */
+export const alterarEstadoDoImovelSchema = z.object({
+  estado: z.enum(
+    ESTADOS_COMERCIAIS_ALCANCAVEIS,
+    'Selecione um estado valido para o imovel.',
+  ),
+});
+export type EntradaDeAlterarEstado = z.infer<
+  typeof alterarEstadoDoImovelSchema
+>;
+
+/**
+ * O estado combina com a finalidade do imovel?
+ *
+ * Marcar como **vendido** um imovel so para locacao, ou **alugado** um imovel
+ * so para venda, e quase sempre engano de clique — os dois botoes ficam lado a
+ * lado. Recusar com mensagem clara custa menos do que descobrir semanas depois
+ * que o relatorio de vendas conta locacoes.
+ */
+export function estadoIncompativelComAFinalidade(
+  estado: EstadoComercialAlcancavel,
+  finalidade: PropertyPurpose,
+): string | null {
+  if (estado === PropertyStatus.SOLD && finalidade === PropertyPurpose.RENT) {
+    return 'Este imovel esta cadastrado apenas para locacao. Marque-o como alugado, ou mude a finalidade antes.';
+  }
+
+  if (estado === PropertyStatus.RENTED && finalidade === PropertyPurpose.SALE) {
+    return 'Este imovel esta cadastrado apenas para venda. Marque-o como vendido, ou mude a finalidade antes.';
+  }
+
+  return null;
+}

@@ -12,10 +12,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  alterarEstadoDoImovelSchema,
   atualizarImovelSchema,
   criarImovelSchema,
   filtrosDeImoveisSchema,
   paginacaoSchema,
+  type EntradaDeAlterarEstado,
   type EntradaDeAtualizarImovel,
   type EntradaDeCriarImovel,
   type FiltrosDeImoveis,
@@ -117,6 +119,24 @@ export class ImoveisController {
     @Param('id') id: string,
   ) {
     return this.imoveis.despublicar(requisicao.autorizacao, id);
+  }
+
+  /**
+   * Estado comercial. `imovel:editar` e nao `imovel:arquivar`: as duas acoes
+   * tem **o mesmo escopo para os quatro papeis** na matriz, entao escolher uma
+   * ou outra nao mudaria quem alcanca o que. Fica a mais geral, e a distincao
+   * que importa — qual evento aconteceu — vive no nome da linha de auditoria.
+   */
+  @Post(':id/estado')
+  @HttpCode(200)
+  @Exige('imovel:editar')
+  alterarEstado(
+    @Req() requisicao: RequisicaoAutorizada,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(alterarEstadoDoImovelSchema))
+    dados: EntradaDeAlterarEstado,
+  ) {
+    return this.imoveis.alterarEstado(requisicao.autorizacao, id, dados);
   }
 
   @Delete(':id')

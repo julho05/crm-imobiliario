@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
+  estadoIncompativelComAFinalidade,
   mensagemDePrecoFaltando,
   paraSlug,
   precoFaltandoParaAFinalidade,
+  type EntradaDeAlterarEstado,
   type EntradaDeAtualizarImovel,
   type EntradaDeCriarImovel,
   type FiltrosDeImoveis,
@@ -106,6 +108,27 @@ const SELECAO_DE_IMOVEL = {
  * merece erro legivel em vez de laco eterno.
  */
 const TENTATIVAS_DE_CODIGO = 3;
+
+/**
+ * Estados em que o imovel **nao** pode continuar anunciado.
+ *
+ * `RESERVED` nao esta aqui: o catalogo o mostra com etiqueta, porque reserva
+ * cai e o proximo interessado e quem salva a venda (item C1).
+ */
+const ESTADOS_FORA_DO_CATALOGO: PropertyStatus[] = [
+  'SOLD',
+  'RENTED',
+  'INACTIVE',
+];
+
+/** Um nome de evento por estado, para que a auditoria responda perguntas. */
+const ACAO_DE_AUDITORIA_POR_ESTADO: Record<string, string> = {
+  AVAILABLE: 'imovel.disponibilizado',
+  RESERVED: 'imovel.reservado',
+  SOLD: 'imovel.vendido',
+  RENTED: 'imovel.alugado',
+  INACTIVE: 'imovel.arquivado',
+};
 
 @Injectable()
 export class ImoveisService {
@@ -416,6 +439,100 @@ export class ImoveisService {
       );
 
       return paraRespostaDeImovel(publicado);
+    });
+  }
+
+  /**
+   * Muda o **estado comercial**: disponivel, reservado, vendido, alugado ou
+   * inativo.
+   *
+   * ## Por que isto nao e um campo do `PATCH`
+   *
+   * Pelo mesmo motivo da publicacao: "marquei como vendido" e um acontecimento,
+   * e a auditoria precisa distingui-lo de "corrigi o titulo". Como campo de
+   * edicao, as duas coisas gerariam a mesma linha de log, e a pergunta que se
+   * faz a auditoria depois — quando este imovel foi vendido? — nao teria
+   * resposta.
+   *
+   * ## Vendido, alugado ou inativo sai do ar
+   *
+   * E a unica parte em que `status` e `publishedAt` **nao** sao independentes,
+   * e ela e obrigatoria por coerencia: `publicar()` recusa imovel vendido, logo
+   * um imovel vendido **e** publicado seria um estado que a propria API proibe
+   * criar. Deixa-lo no catalogo geraria lead para um imovel que nao existe
+   * mais, que e o erro que a imobiliaria descobre pelo cliente irritado.
+   *
+   * `RESERVED` continua no ar de proposito: o catalogo o mostra com etiqueta
+   * (item C1), porque reserva cai e o interessado da fila e quem salva a venda.
+   */
+  async alterarEstado(
+    contexto: ContextoAutorizado,
+    id: string,
+    dados: EntradaDeAlterarEstado,
+  ): Promise<RespostaDeImovel> {
+    const carregado = await this.carregar(contexto, id);
+
+    const imovel = this.autorizacao.conferir(contexto, carregado, {
+      responsavelId: carregado?.ownerMemberId ?? null,
+    });
+
+    if (imovel.status === dados.estado) {
+      throw new BadRequestException('O imovel ja esta nesse estado.');
+    }
+
+    const incompativel = estadoIncompativelComAFinalidade(
+      dados.estado,
+      imovel.purpose,
+    );
+
+    if (incompativel) {
+      throw new BadRequestException({
+        mensagem: 'Dados invalidos.',
+        erros: [{ campo: 'estado', mensagem: incompativel }],
+      });
+    }
+
+    // Voltar a `AVAILABLE` exige o preco da finalidade, como publicar: e o
+    // estado que o catalogo mostra sem etiqueta nenhuma.
+    if (dados.estado === 'AVAILABLE') {
+      this.recusarSePublicacaoNaoFazSentido({ ...imovel, status: 'DRAFT' });
+    }
+
+    const saiDoAr = ESTADOS_FORA_DO_CATALOGO.includes(dados.estado);
+    const estavaNoAr = imovel.publishedAt !== null;
+
+    return this.prisma.$transaction(async (tx) => {
+      const atualizado = await tx.property.update({
+        where: { id: imovel.id },
+        data: {
+          status: dados.estado,
+          ...(saiDoAr && estavaNoAr ? { publishedAt: null } : {}),
+        },
+        select: SELECAO_DE_IMOVEL,
+      });
+
+      await this.autorizacao.registrar(
+        contexto,
+        {
+          entityType: 'Property',
+          entityId: imovel.id,
+          // Nome por evento, e nao um `imovel.estadoAlterado` generico: quem
+          // consulta o historico pergunta "quando foi vendido?", nao "quando o
+          // campo status mudou?".
+          action: ACAO_DE_AUDITORIA_POR_ESTADO[dados.estado],
+          metadata: {
+            codigo: imovel.code,
+            estadoAnterior: imovel.status,
+            estado: dados.estado,
+            // Registra o efeito colateral: sem isto, o log mostraria o imovel
+            // saindo do catalogo sem dizer por que.
+            saiuDoCatalogo: saiDoAr && estavaNoAr,
+          },
+        },
+        tx,
+      );
+
+      return paraRespostaDeImovel(atualizado);
     });
   }
 
