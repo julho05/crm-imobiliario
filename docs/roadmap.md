@@ -111,7 +111,7 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B5 | Leads — *concluído em 21/10/2026* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
 | B6 | Fila de não atribuídos — *concluído em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
 | B7 | Funil — *concluído em 21/10/2026* | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
-| B8 | Agenda e tarefas | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
+| B8 | Agenda e tarefas — *API concluída em 21/10/2026; telas pendentes* | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
 | B9 | Dashboard | Conteúdo muda por papel; organização nova mostra primeiros passos, não zeros | B1, B5 |
 | B10 | Desempenho de listagem | Paginação em todas as listas; **teste que conta consultas** e falha se a listagem fizer uma por item | B1, B5 |
 
@@ -195,6 +195,28 @@ Detalhe que tornou os totais possíveis: o resumo é pedido com `incluirFechadas
 
 O seed agora cria **15 negociações** nas três organizações, espalhadas pelas seis etapas, duas delas fechadas, uma sem imóvel e uma sem valor esperado.
 
+### Agenda e tarefas — API **concluída em 21/10/2026**
+
+Onze rotas em `/api/visitas` e `/api/tarefas`, com 94 testes.
+
+**A visibilidade ganhou uma segunda porta, e isso é uma mudança de regra.** Em `Visit` e `Task` o responsável é **obrigatório** e o cliente é **opcional** — o inverso de `Deal`. Isso criou um caso que a regra original não resolvia: o gerente manda o Tiago conduzir a visita do cliente da Bianca, porque ela não pode no sábado. O Tiago precisa ver a visita — ele vai encontrar a pessoa.
+
+**[DECIDIDO 21/10/2026]** Enxerga quem responde pelo **registro** ou pelo **cliente**. O que o responsável pela visita recebe do cliente é o mínimo do encontro — **nome e telefone**, e nada mais: sem anotações, sem origem, sem situação, e a ficha do cliente continua respondendo 404 para ele. A diferença entre "sei com quem me encontro sábado" e "tenho acesso ao cliente do meu colega" é exatamente essa lista de campos, e há teste para cada parte dela.
+
+A contrapartida: **atribuir passou a ser uma forma de revelar um contato**. Por isso só `MANAGER` para cima atribui — o que a matriz já dizia — e a auditoria registra `revelouCliente` quando a atribuição deu acesso a alguém que não atende aquele cliente.
+
+Outras decisões:
+
+- **`negociacao:*` serve para visitas e tarefas**, porque §4.3 trata `Deal`, `Visit` e `Task` como um grupo com uma linha de matriz. Inventar `visita:ver` exigiria decidir o escopo dos quatro papéis de novo, e duas matrizes para a mesma regra divergem no primeiro ajuste
+- **Datas em ISO 8601 com fuso, obrigatoriamente.** Sem o fuso o valor é ambíguo e o servidor teria de adivinhar — errando duas vezes por ano, quando o horário de verão muda
+- **A agenda não pagina**, e o contrato limita o período a seis meses: a tela mostra um dia, uma semana ou um mês inteiros, e "as primeiras vinte do mês" não é uma agenda
+- **`completedAt` é derivado** da situação, como o `closedAt` da negociação
+- **"Vencida" é calculado no servidor**, não na interface: depende do relógio, e o do navegador pode estar errado ou em outro fuso
+
+**Uma armadilha nova, registrada:** filtrar por relação opcional no Prisma (`lead: { deletedAt: null }`) **exige que a relação exista**, então a visita sem cliente desapareceria da agenda. A forma correta é `OR: [{ leadId: null }, { lead: {...} }]`. É engano que passa no caminho feliz, porque o caso de teste costuma ter cliente.
+
+Pendente deste item: as **telas** (`/painel/agenda` e `/painel/tarefas`) e o seed, que ainda não cria visita nem tarefa.
+
 ---
 
 ## Fase 3: catálogo público
@@ -239,8 +261,9 @@ Um corretor entra, cadastra e publica imóvel, recebe lead do catálogo, agenda 
 | Pendência | Bloqueia | Quem decide |
 |---|---|---|
 | Domínio único ou separado para API e site | A3 | Responsável, com validação na Fase 4 |
+| ~~Hospedagem: gerenciada ou VPS~~ | ~~D1~~ | **Decidido em 21/10/2026: gerenciada**, plano Unlimited da Hostinger, limites confirmados pelo suporte |
 | Serviço de e-mail transacional | **Só produção** — A8, A9 e A10 já funcionam em dev pela porta `RemetenteDeEmail`, com `EMAIL_PROVIDER=log` | Responsável (tem custo) |
-| Armazenamento de objetos | B4 | Responsável (tem custo) |
+| ~~Armazenamento de objetos~~ | ~~B4~~ | **Decidido em 21/10/2026: Cloudflare R2.** Gratuito até 10 GB; a Hostinger não oferece o serviço. Ver `architecture.md` |
 | ~~Campos obrigatórios do imóvel~~ | ~~B1~~ | **Decidido em 21/10/2026**: piso do banco mais preço coerente com a finalidade. Ver `packages/shared/src/schemas/imovel.ts` |
 | Unificar leads duplicados no MVP | B5 | Responsável |
 | Mecanismo anti-spam | C6 | Responsável (custo e LGPD) |
