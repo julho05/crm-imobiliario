@@ -108,8 +108,8 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B2 | Publicação — *concluído em 21/10/2026* | `status` e `publishedAt` independentes; publicar/despublicar registrado em auditoria | B1 |
 | B3 | Privacidade do endereço | `addressVisibility` nasce em `NEIGHBORHOOD_ONLY`; teste confirma que a API pública **não** devolve rua, número, CEP nem coordenada exata quando não deve | B1 |
 | B4 | Fotos e mídia | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
-| B5 | Leads — *API concluída em 21/10/2026; telas pendentes* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
-| B6 | Fila de não atribuídos — *API concluída em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
+| B5 | Leads — *concluído em 21/10/2026* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
+| B6 | Fila de não atribuídos — *concluído em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
 | B7 | Funil | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
 | B8 | Agenda e tarefas | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
 | B9 | Dashboard | Conteúdo muda por papel; organização nova mostra primeiros passos, não zeros | B1, B5 |
@@ -149,7 +149,19 @@ Decisões tomadas durante a implementação:
 - **A fila não tem rota própria**: é o filtro `naoAtribuidos=true`, com a permissão conferida no serviço. Duas rotas lendo a mesma tabela duplicariam recorte, paginação e busca, e um dia só uma ganharia um filtro novo
 - **Pedir a fila sem `lead:verNaoAtribuidos` responde 403**, e não lista vazia: lista vazia mostraria uma fila em ordem onde há uma recusa
 
-Pendente deste item: as **telas** (`/painel/leads`, `/painel/leads/a-distribuir`, `/painel/leads/[id]`) e o seed, que ainda não cria lead nenhum.
+### Telas de clientes — **concluídas em 21/10/2026**
+
+`/painel/leads`, `/painel/leads/novo` e `/painel/leads/[id]`, mais o contador da fila no `/painel`.
+
+Três decisões de interface vale registrar:
+
+- **A fila é uma aba, não uma tela separada** como o mapa previa. A API é a mesma rota com um filtro, e duas telas com busca, paginação e lista idênticas garantiriam que um dia só uma ganhasse uma coluna nova. A aba só aparece para quem tem `lead:verNaoAtribuidos`
+- **O aviso de duplicata diz o que fazer em cada nível.** Duplicata própria vira link para o contato existente; duplicata de colega diz que há contato na organização com aquele telefone e manda falar com quem coordena. Aviso que não aponta uma ação é só um susto
+- **A fila vazia é boa notícia**, e o estado vazio diz isso em vez de "nenhum cliente cadastrado" — que ali seria errado e assustador
+
+Entrou junto, por necessidade: **`GET /equipe/membros`** (nome, papel e `Membership.id`, **sem e-mail**). O seletor de responsável não tinha de onde tirar a lista, então o `POST /leads/:id/responsavel` existia sem interface possível. Sem e-mail porque §4.4 dá ao `AGENT` acesso a "nome e papel" dos colegas, não à agenda de contatos da imobiliária.
+
+O seed agora cria **24 leads** nas três organizações, com os pontos de variação que as telas precisam: quatro na fila, dois com o mesmo telefone, um só com e-mail, consentimento registrado em quem veio da vitrine, e as cinco situações.
 
 ---
 

@@ -3,6 +3,7 @@ import { AutorizacaoModule } from '../autorizacao/autorizacao.module';
 import { ConvitesPublicosController } from './convites-publicos.controller';
 import { ConvitesService } from './convites.service';
 import { EquipeController } from './equipe.controller';
+import { MembrosService } from './membros.service';
 
 /**
  * Equipe: convites e, mais adiante, membros e papeis.
@@ -15,6 +16,6 @@ import { EquipeController } from './equipe.controller';
 @Module({
   imports: [AutorizacaoModule],
   controllers: [EquipeController, ConvitesPublicosController],
-  providers: [ConvitesService],
+  providers: [ConvitesService, MembrosService],
 })
 export class EquipeModule {}

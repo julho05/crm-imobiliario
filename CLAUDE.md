@@ -34,7 +34,15 @@ O seed cria três organizações — uma imobiliária com os quatro papéis e 26
 
 **O seed pagou-se na primeira hora:** ele revelou que o painel tratava "tem vínculo em duas organizações e ainda não escolheu" como "conta sem organização nenhuma" — e dizia à pessoa que ela não pertencia a lugar nenhum, sem oferecer saída. A API estava certa: devolve `null` de propósito para forçar a escolha explícita. A tela agora distingue os dois casos. Nenhum teste automatizado pegaria isso, porque não há teste de componente no site.
 
-Ainda não existem telas de clientes.
+Em 21/10/2026 entraram o **B5** e o **B6** — leads e fila de não atribuídos — com API e telas. São **532 testes**.
+
+**A inversão em relação a imóveis é o que define o item.** `imovel:ver` é `ORG` para os quatro papéis; `lead:ver` é **`OWN`** para o corretor. Então o imóvel do colega responde **403** ao ser editado (ele o vê na lista; esconder seria teatro) e o lead do colega responde **404** (ele não o vê; um 403 entregaria o que o escopo `OWN` existe para negar). Quem decide é a matriz, pelo `AutorizacaoService`, sem lista escrita à mão.
+
+A duplicata por telefone é sinalizada em **dois níveis**, e isso merece atenção se alguém mexer: duplicata no alcance de quem cadastra vem com nome e responsável; duplicata de um colega vem apenas como `{ nivel: 'restrita' }`. Sem esse recorte, a busca do cadastro vazaria a carteira do colega. O nível restrito ainda revela *que* alguém tem aquele telefone — troca deliberada, porque sem aviso nenhum dois corretores ligam para a mesma pessoa no mesmo dia.
+
+Entrou junto, por necessidade: **`GET /equipe/membros`** (nome, papel e `Membership.id`, **sem e-mail**) — o seletor de responsável não tinha de onde tirar a lista.
+
+Ainda não existem funil, agenda nem catálogo público.
 
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 
@@ -51,6 +59,8 @@ Registradas com data em [docs/permissions.md](docs/permissions.md) §9, [docs/da
 - **Campos obrigatórios do imóvel** (21/10/2026): só o piso do banco — título, tipo, finalidade, UF, cidade, bairro — mais o preço coerente com a finalidade. Área e dormitórios são opcionais, porque campo obrigatório que o corretor ainda não sabe produz número inventado. Consequência registrada para a Fase 3: filtro por área ou dormitório tem de **excluir** o imóvel sem o valor, nunca tratá-lo como zero
 - **Código do imóvel** (21/10/2026): gerado pelo servidor (`AP-001`, sequencial por organização, prefixo pelo tipo) e **editável** — a imobiliária que já numera imóveis usa essa referência no anúncio e no WhatsApp
 - **Visibilidade do endereço é editável** (21/10/2026), ao contrário de `status` e `ownerMemberId`: é decisão de quem cadastra e precisa estar no formulário. O padrão restritivo continua no banco, então omitir o campo nunca abre o endereço — o esquecimento erra para o lado seguro
+- **O lead nasce atribuído a quem cadastrou** (21/10/2026), inclusive para `MANAGER` e acima. A matriz só exigia isso do `AGENT`; para os outros, deixá-lo sem responsável faria o contato que o gerente acabou de atender no telefone cair na fila como se ninguém o tivesse visto. Devolver à fila é um clique (`responsavel: null`)
+- **`origem` do lead não é editável** (21/10/2026): ela registra como o contato chegou, e editável transformaria o relatório de origem em opinião. `PUBLIC_CATALOG` é recusada no cadastro manual — só a vitrine a produz
 - **Seis etapas no funil**, não cinco (21/10/2026): era divergência de redação em `docs/data-model.md` §3.4, já corrigida. `Fechado` e `Perdido` são etapas distintas, e o código semeia seis desde o A2
 
 ## Stack proposta

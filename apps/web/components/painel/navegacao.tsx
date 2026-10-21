@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, LayoutDashboard } from 'lucide-react';
+import { Building2, LayoutDashboard, Users } from 'lucide-react';
 import { podeFazer, type Acao, type Role } from '@app/shared';
 import { cn } from '@/lib/utils';
 
@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
  *
  * ## So o que existe
  *
- * Esta lista tem dois itens porque sao as duas secoes construidas. Leads, funil,
+ * Esta lista tem tres itens porque sao as tres secoes construidas. Funil,
  * agenda, equipe, organizacao, auditoria e perfil entram **quando existirem**:
  * menu que leva a tela vazia ou a 404 e pior do que menu curto, porque ensina a
  * pessoa a nao confiar na navegacao.
@@ -54,6 +54,12 @@ const ITENS: ItemDeMenu[] = [
     href: '/painel/imoveis',
     icone: Building2,
     acao: 'imovel:ver',
+  },
+  {
+    rotulo: 'Clientes',
+    href: '/painel/leads',
+    icone: Users,
+    acao: 'lead:ver',
   },
 ];
 

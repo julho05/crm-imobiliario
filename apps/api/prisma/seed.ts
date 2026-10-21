@@ -6,6 +6,8 @@ import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import {
   ETAPAS_PADRAO_DO_FUNIL,
   paraSlug,
+  type LeadSource,
+  type LeadStatus,
   type PropertyPurpose,
   type PropertyStatus,
   type PropertyType,
@@ -123,6 +125,19 @@ type ImovelDoSeed = {
   responsavel: number | null;
 };
 
+type LeadDoSeed = {
+  nomeCompleto: string;
+  telefone?: string;
+  email?: string;
+  origem: LeadSource;
+  status: LeadStatus;
+  observacoes?: string;
+  /** Indice em `pessoas`, ou `null` para a fila de nao atribuidos. */
+  responsavel: number | null;
+  /** Visitante do catalogo: consentimento registrado. */
+  consentiu?: boolean;
+};
+
 const AURORA: PessoaDoSeed[] = [
   { nome: 'Helena Vasques', email: 'helena@exemplo.com', papel: 'OWNER' },
   { nome: 'Rafael Dumont', email: 'rafael@exemplo.com', papel: 'ADMIN' },
@@ -229,6 +244,178 @@ function imoveisDaAurora(): ImovelDoSeed[] {
   });
 }
 
+/**
+ * Dezoito leads na organizacao grande.
+ *
+ * Os pontos de variacao nao sao decorativos — cada um existe para que uma tela
+ * possa ser conferida:
+ *
+ * - **tres na fila** (`responsavel: null`), para o item B6 e o contador
+ * - **dois com o mesmo telefone**, para a sinalizacao de duplicata
+ * - **um so com e-mail** e **um so com telefone**, porque o contrato aceita
+ *   qualquer um dos dois e a tela precisa lidar com o campo ausente
+ * - **origem `PUBLIC_CATALOG` com consentimento**, que e o unico caso em que o
+ *   bloco de consentimento aparece na tela
+ * - **as cinco situacoes**, para o filtro e para as etiquetas
+ */
+function leadsDaAurora(): LeadDoSeed[] {
+  return [
+    {
+      nomeCompleto: 'Marcia Albuquerque',
+      telefone: '11988881111',
+      email: 'marcia.albuquerque@exemplo.com',
+      origem: 'PUBLIC_CATALOG',
+      status: 'NEW',
+      observacoes: 'Chegou pelo anuncio do AP-001. Quer visitar no sabado.',
+      responsavel: 3,
+      consentiu: true,
+    },
+    {
+      nomeCompleto: 'Joaquim Ferraz',
+      telefone: '11988882222',
+      origem: 'MANUAL',
+      status: 'CONTACTED',
+      observacoes: 'Ligou perguntando por imovel de dois dormitorios.',
+      responsavel: 3,
+    },
+    {
+      nomeCompleto: 'Leticia Barros',
+      email: 'leticia.barros@exemplo.com',
+      origem: 'REFERRAL',
+      status: 'QUALIFIED',
+      observacoes: 'Indicada pela Marcia. Credito pre-aprovado.',
+      responsavel: 3,
+    },
+    {
+      nomeCompleto: 'Ricardo Teles',
+      telefone: '11988883333',
+      email: 'ricardo.teles@exemplo.com',
+      origem: 'PUBLIC_CATALOG',
+      status: 'CONVERTED',
+      observacoes: 'Fechou a CA-001. Documentacao em andamento.',
+      responsavel: 3,
+      consentiu: true,
+    },
+    {
+      nomeCompleto: 'Sonia Meireles',
+      telefone: '11988884444',
+      origem: 'MANUAL',
+      status: 'DISQUALIFIED',
+      observacoes: 'Procura em outra cidade. Sem perfil para a carteira.',
+      responsavel: 3,
+    },
+    {
+      nomeCompleto: 'Henrique Pontes',
+      telefone: '11988885555',
+      email: 'henrique.pontes@exemplo.com',
+      origem: 'PUBLIC_CATALOG',
+      status: 'NEW',
+      responsavel: 4,
+      consentiu: true,
+    },
+    {
+      nomeCompleto: 'Vera Lucia Andrade',
+      telefone: '11988886666',
+      origem: 'MANUAL',
+      status: 'CONTACTED',
+      observacoes: 'Prefere contato pela manha.',
+      responsavel: 4,
+    },
+    {
+      nomeCompleto: 'Fabio Nunes',
+      telefone: '11988887777',
+      origem: 'IMPORT',
+      status: 'NEW',
+      observacoes: 'Importado da planilha antiga.',
+      responsavel: 4,
+    },
+    {
+      nomeCompleto: 'Camila Rezende',
+      telefone: '11988888888',
+      email: 'camila.rezende@exemplo.com',
+      origem: 'REFERRAL',
+      status: 'QUALIFIED',
+      responsavel: 4,
+    },
+    // Mesmo telefone do Joaquim Ferraz, de proposito: e a duplicata que a tela
+    // de cadastro sinaliza. Esta pertence a outra pessoa, entao o corretor 3 ve
+    // a dele completa e esta como "restrita".
+    {
+      nomeCompleto: 'Joaquim F. Ferraz',
+      telefone: '11988882222',
+      origem: 'PUBLIC_CATALOG',
+      status: 'NEW',
+      observacoes: 'Possivel duplicata do Joaquim Ferraz.',
+      responsavel: 4,
+      consentiu: true,
+    },
+    {
+      nomeCompleto: 'Beatriz Olinto',
+      telefone: '11988889999',
+      origem: 'MANUAL',
+      status: 'CONTACTED',
+      responsavel: 2,
+    },
+    {
+      nomeCompleto: 'Gustavo Pessoa',
+      telefone: '11977771111',
+      email: 'gustavo.pessoa@exemplo.com',
+      origem: 'OTHER',
+      status: 'NEW',
+      responsavel: 2,
+    },
+    {
+      nomeCompleto: 'Isabel Carvalho',
+      telefone: '11977772222',
+      origem: 'MANUAL',
+      status: 'QUALIFIED',
+      responsavel: 0,
+    },
+    {
+      nomeCompleto: 'Nelson Braga',
+      telefone: '11977773333',
+      origem: 'REFERRAL',
+      status: 'CONTACTED',
+      responsavel: 1,
+    },
+    {
+      nomeCompleto: 'Priscila Matos',
+      telefone: '11977774444',
+      origem: 'PUBLIC_CATALOG',
+      status: 'NEW',
+      observacoes: 'Perguntou pelo AP-003 pelo formulario da vitrine.',
+      responsavel: null,
+      consentiu: true,
+    },
+    {
+      nomeCompleto: 'Eduardo Simoes',
+      telefone: '11977775555',
+      email: 'eduardo.simoes@exemplo.com',
+      origem: 'PUBLIC_CATALOG',
+      status: 'NEW',
+      observacoes: 'Chegou pela vitrine. Imovel sem responsavel.',
+      responsavel: null,
+      consentiu: true,
+    },
+    {
+      nomeCompleto: 'Tereza Gomes',
+      telefone: '11977776666',
+      origem: 'PUBLIC_CATALOG',
+      status: 'NEW',
+      responsavel: null,
+      consentiu: true,
+    },
+    {
+      nomeCompleto: 'Wagner Ribeiro',
+      email: 'wagner.ribeiro@exemplo.com',
+      origem: 'OTHER',
+      status: 'NEW',
+      observacoes: 'So deixou e-mail.',
+      responsavel: 2,
+    },
+  ];
+}
+
 const NOME_POR_TIPO: Record<PropertyType, string> = {
   APARTMENT: 'Apartamento',
   HOUSE: 'Casa',
@@ -259,7 +446,9 @@ async function main() {
 
     const senhaHash = await hash(SENHA, CUSTO_DE_DESENVOLVIMENTO);
 
-    console.log('Criando Imobiliaria Aurora (5 pessoas, 26 imoveis)...');
+    console.log(
+      'Criando Imobiliaria Aurora (5 pessoas, 26 imoveis, 18 leads)...',
+    );
     const aurora = await criarOrganizacao(prisma, {
       nome: 'Imobiliaria Aurora',
       slug: 'aurora',
@@ -267,9 +456,10 @@ async function main() {
       pessoas: AURORA,
       senhaHash,
       imoveis: imoveisDaAurora(),
+      leads: leadsDaAurora(),
     });
 
-    console.log('Criando Meridiano Imoveis (2 pessoas, 4 imoveis)...');
+    console.log('Criando Meridiano Imoveis (2 pessoas, 4 imoveis, 4 leads)...');
     await criarOrganizacao(prisma, {
       nome: 'Meridiano Imoveis',
       slug: 'meridiano',
@@ -337,9 +527,44 @@ async function main() {
           responsavel: null,
         },
       ],
+      leads: [
+        {
+          nomeCompleto: 'Alice Damasceno',
+          telefone: '31988881111',
+          email: 'alice.damasceno@exemplo.com',
+          origem: 'PUBLIC_CATALOG',
+          status: 'NEW',
+          responsavel: 1,
+          consentiu: true,
+        },
+        {
+          nomeCompleto: 'Bruno Caetano',
+          telefone: '31988882222',
+          origem: 'MANUAL',
+          status: 'CONTACTED',
+          responsavel: 0,
+        },
+        {
+          nomeCompleto: 'Carla Pimenta',
+          telefone: '31988883333',
+          origem: 'PUBLIC_CATALOG',
+          status: 'NEW',
+          responsavel: null,
+          consentiu: true,
+        },
+        // Mesmo telefone de um lead da Aurora, de proposito: prova que a
+        // deteccao de duplicata nao atravessa organizacao.
+        {
+          nomeCompleto: 'Homonimo de outra organizacao',
+          telefone: '11988882222',
+          origem: 'MANUAL',
+          status: 'NEW',
+          responsavel: 1,
+        },
+      ],
     });
 
-    console.log('Criando corretor autonomo (1 pessoa, 3 imoveis)...');
+    console.log('Criando corretor autonomo (1 pessoa, 3 imoveis, 2 leads)...');
     await criarOrganizacao(prisma, {
       nome: 'Paulo Reis Imoveis',
       slug: 'paulo-reis',
@@ -392,6 +617,26 @@ async function main() {
           cidade: 'Sao Paulo',
           estado: 'SP',
           areaTotal: 42,
+          responsavel: 0,
+        },
+      ],
+      // O corretor autonomo e OWNER de uma organizacao de um membro: tem
+      // escopo ORG e ve os proprios leads por serem os unicos que existem.
+      leads: [
+        {
+          nomeCompleto: 'Denise Portela',
+          telefone: '11966661111',
+          origem: 'PUBLIC_CATALOG',
+          status: 'CONTACTED',
+          observacoes: 'Interessada na casa de vila.',
+          responsavel: 0,
+          consentiu: true,
+        },
+        {
+          nomeCompleto: 'Elias Tavares',
+          email: 'elias.tavares@exemplo.com',
+          origem: 'REFERRAL',
+          status: 'NEW',
           responsavel: 0,
         },
       ],
@@ -530,6 +775,7 @@ async function criarOrganizacao(
     pessoas: PessoaDoSeed[];
     senhaHash: string;
     imoveis: ImovelDoSeed[];
+    leads?: LeadDoSeed[];
   },
 ): Promise<string> {
   const organizacao = await prisma.organization.create({
@@ -613,21 +859,49 @@ async function criarOrganizacao(
     });
   }
 
+  for (const lead of dados.leads ?? []) {
+    await prisma.lead.create({
+      data: {
+        organizationId: organizacao.id,
+        fullName: lead.nomeCompleto,
+        phone: lead.telefone,
+        email: lead.email,
+        source: lead.origem,
+        status: lead.status,
+        notes: lead.observacoes,
+        assignedMemberId:
+          lead.responsavel === null ? null : vinculos[lead.responsavel],
+        // Consentimento so existe para quem chegou pela vitrine: e prova do
+        // visitante, montada pelo servidor no envio do formulario. Lead
+        // digitado a mao pelo corretor nao tem consentimento a registrar, e
+        // inventar um aqui criaria prova falsa no banco de desenvolvimento.
+        ...(lead.consentiu
+          ? {
+              consentGivenAt: new Date(),
+              privacyNoticeVersion: '2026-10-01',
+              // Hash, nunca o IP. O valor e inventado e tem o formato certo.
+              consentIpHash: 'seed-sem-ip-real',
+            }
+          : {}),
+      },
+    });
+  }
+
   return organizacao.id;
 }
 
 function imprimirResumo(): void {
   const linhas = [
-    ['Imobiliaria Aurora', '26 imoveis', ''],
+    ['Imobiliaria Aurora', '26 im./18 leads', '3 leads na fila a distribuir'],
     ['  helena@exemplo.com', 'OWNER', 've e edita tudo, exclui'],
     ['  rafael@exemplo.com', 'ADMIN', 've e edita tudo, exclui'],
     ['  celina@exemplo.com', 'MANAGER', 've e edita tudo, NAO exclui'],
-    ['  tiago@exemplo.com', 'AGENT', 've todos, edita so os dele'],
-    ['  bianca@exemplo.com', 'AGENT', 've todos, edita so os dela'],
-    ['Meridiano Imoveis', '4 imoveis', ''],
+    ['  tiago@exemplo.com', 'AGENT', '5 leads; ve so os dele'],
+    ['  bianca@exemplo.com', 'AGENT', '5 leads; ve so os dela'],
+    ['Meridiano Imoveis', '4 im./4 leads', '1 lead na fila'],
     ['  otavio@exemplo.com', 'OWNER', ''],
     ['  dora@exemplo.com', 'AGENT', 'tambem e AGENT na Aurora'],
-    ['Paulo Reis Imoveis', '3 imoveis', 'corretor autonomo'],
+    ['Paulo Reis Imoveis', '3 im./2 leads', 'corretor autonomo'],
     ['  paulo@exemplo.com', 'OWNER', 'organizacao de um membro'],
   ];
 

@@ -18,6 +18,7 @@ import { AutorizacaoGuard } from '../autorizacao/autorizacao.guard';
 import type { RequisicaoAutorizada } from '../autorizacao/autorizacao.guard';
 import { Exige } from '../autorizacao/exige.decorator';
 import { ConvitesService } from './convites.service';
+import { MembrosService } from './membros.service';
 
 /**
  * Administracao de convites, dentro da organizacao ativa.
@@ -34,12 +35,27 @@ import { ConvitesService } from './convites.service';
  * da requisicao, e `@Exige` e estatico por rota. Essa parte e conferida no
  * servico, e e ela que impede o `MANAGER` de criar um `ADMIN`.
  */
-@Controller('equipe/convites')
+@Controller('equipe')
 @UseGuards(AutorizacaoGuard)
 export class EquipeController {
-  constructor(private readonly convites: ConvitesService) {}
+  constructor(
+    private readonly convites: ConvitesService,
+    private readonly membros: MembrosService,
+  ) {}
 
-  @Post()
+  /**
+   * A equipe da organizacao ativa: nome, papel e `Membership.id`.
+   *
+   * Existe para o seletor de responsavel da tela de leads. Sem e-mail, de
+   * proposito — ver a nota em `membros.service.ts`.
+   */
+  @Get('membros')
+  @Exige('equipe:verMembros')
+  async listarMembros(@Req() requisicao: RequisicaoAutorizada) {
+    return { membros: await this.membros.listar(requisicao.autorizacao) };
+  }
+
+  @Post('convites')
   @HttpCode(201)
   @Exige('equipe:convidarAgent')
   async convidar(
@@ -59,7 +75,7 @@ export class EquipeController {
     };
   }
 
-  @Get()
+  @Get('convites')
   @Exige('equipe:verMembros')
   listar(@Req() requisicao: RequisicaoAutorizada) {
     return this.convites
@@ -67,7 +83,7 @@ export class EquipeController {
       .then((convites) => ({ convites }));
   }
 
-  @Delete(':id')
+  @Delete('convites/:id')
   @HttpCode(200)
   @Exige('equipe:convidarAgent')
   async revogar(
