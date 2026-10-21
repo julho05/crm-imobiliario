@@ -238,6 +238,8 @@ Duas organizações completas, criadas por *fixture* e reutilizadas:
 - **Org B**: `owner_b`, `agent_b1` · 1 imóvel, 1 lead
 - **`user_dual`**: membro de A (`AGENT`) e de B (`AGENT`)
 
+**Coberto para imóveis em 21/10/2026** (§8.2, §8.3 e §8.4), em `apps/api/test/imoveis/isolamento.http.spec.ts`, contra `/api/imoveis` — a rota que o site usa, e não rotas de teste. Lead, negociação, visita, tarefa e membro seguem pendentes, e entram com os endpoints deles.
+
 ### 8.2 Travessia entre organizações — deve dar 404
 
 Para **cada** endpoint de leitura, escrita e exclusão, autenticado como `agent_b1`, usando ID de recurso da Org A:
@@ -277,6 +279,10 @@ Há **um** endpoint que lê `organizationId` do cliente — `POST /autenticacao/
 ### 8.6 Regra de ouro
 
 **[PROPOSTA]** Endpoint novo sem teste de travessia não entra. Vale uma verificação no CI que liste rotas autenticadas sem teste correspondente — é o tipo de coisa que se esquece exatamente quando o projeto fica grande e a pressa aumenta.
+
+**Aplicada pela primeira vez em 21/10/2026**, no item B1: as cinco rotas de `/api/imoveis` nasceram com teste de travessia no mesmo commit. A verificação automática no CI **não** existe ainda — hoje a regra depende de disciplina, que é exatamente o que ela deveria substituir.
+
+Uma observação que o §8.2 não antecipava, e que o B1 trouxe: **404 não é a resposta certa em todo caso de recusa.** Dentro da mesma organização, quando o papel lê o registro mas não pode escrevê-lo, a resposta é **403** — é o par `imovel:ver` ORG / `imovel:editar` OWN descrito no §8.3. O 404 é para travessia **entre** organizações. Confundir os dois levaria a esconder do corretor um imóvel que ele está vendo na tela.
 
 ---
 

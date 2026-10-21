@@ -273,6 +273,11 @@ async function criarImovel(
       title: `Imovel ${params.code}`,
       type: 'APARTMENT',
       purpose: 'SALE',
+      // O preco acompanha a finalidade de proposito. Imovel `SALE` sem preco
+      // existe no banco (a coluna e nula) e o produto tolera, mas um cenario
+      // base incoerente faz os testes dos outros itens partirem de um dado
+      // que o cadastro nunca produziria.
+      price: 450000,
       state: 'SP',
       city: 'Sao Paulo',
       neighborhood: 'Centro',

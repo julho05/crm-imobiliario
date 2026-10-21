@@ -66,7 +66,9 @@ Situação em 20/10/2026: **A1 a A10 concluídos.** Verificável com `npm run ve
 
 **Decisão de 20/10/2026 — o e-mail entra por uma porta.** O provedor transacional continua **não escolhido**, mas deixou de bloquear: o código depende da classe abstrata `RemetenteDeEmail`, e o adaptador de desenvolvimento (`EMAIL_PROVIDER=log`) escreve a mensagem no terminal. A API **recusa iniciar** com esse adaptador em produção, porque o corpo carrega o token em claro e log é copiado e agregado por mais gente do que a caixa de entrada da pessoa. Trocar pelo provedor real é uma classe e uma linha no `EmailModule`.
 
-Em aberto: **A11** (depende da decisão de rate limiting), **A12** e **A13** (o passo 7 está implementado e testado em convites; falta aplicá-lo a cada escrita quando houver endpoint de recurso).
+**A12 e A13 fecharam em 21/10/2026**, junto com o item B1 — e não antes dele por uma razão de método: os dois só existem de verdade contra endpoint de recurso. Até ali, o que havia era a guarda provada por rotas que existiam somente no teste, o que demonstra que o mecanismo funciona mas não que a rota de produção se lembra de chamá-lo. Ver `apps/api/test/imoveis/isolamento.http.spec.ts`.
+
+Em aberto: **A11**, que depende da decisão de rate limiting.
 
 **Limitação conhecida do A9.** As respostas são idênticas em status e corpo, mas o *tempo* de resposta não é: quando a conta existe, há escrita no banco e envio de e-mail. Com o adaptador de log a diferença é desprezível; com um provedor real, a latência da chamada tornaria a existência da conta observável por cronômetro. A correção é enviar fora do caminho da requisição, e ela entra junto com a escolha do provedor.
 
@@ -87,20 +89,22 @@ Depende de: 1.1 concluído · decisão de domínio único ou separado · serviç
 | A9 | Recuperação de senha | Resposta idêntica exista o e-mail ou não; token de uso único; redefinir **encerra as outras sessões** do usuário | A2, A3 |
 | A10 | Convites | `OWNER`/`ADMIN`/`MANAGER` convidam conforme a hierarquia; `OWNER` não é convidável; token com hash e expiração; aceitar cria `Membership` | A5 |
 | A11 | Rate limiting | Login, recuperação e captura de lead limitados por IP; teste confirma bloqueio após N tentativas | A4 |
-| A12 | **Testes de isolamento multi-tenant** | Os cenários de [permissions.md](permissions.md) §8 passando: travessia entre organizações devolve **404 e nunca 403**, escopo `OWN` respeitado, organização ativa não é manipulável pelo cliente | A5, A6, A7 |
-| A13 | Auditoria de escrita | Toda escrita gera `Activity`; nenhum endpoint permite editar o log | A5 |
+| A12 | **Testes de isolamento multi-tenant** — *concluído em 21/10/2026* | Os cenários de [permissions.md](permissions.md) §8 passando: travessia entre organizações devolve **404 e nunca 403**, escopo `OWN` respeitado, organização ativa não é manipulável pelo cliente | A5, A6, A7 |
+| A13 | Auditoria de escrita — *concluído em 21/10/2026* | Toda escrita gera `Activity`; nenhum endpoint permite editar o log | A5 |
 
 **A12 é o critério de saída da Fase 1.** Sem ele, nada do que vem depois pode ser considerado seguro: é o teste que prova que uma organização não vê dados de outra.
+
+**Fechado em 21/10/2026.** A Fase 1 tem um único item em aberto, o A11, e ele não bloqueia a Fase 2.
 
 ---
 
 ## Fase 2: gestão imobiliária
 
-Depende de: Fase 1 completa, **A12 inclusive** · armazenamento de objetos escolhido · campos obrigatórios do imóvel decididos.
+Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos obrigatórios do imóvel decididos (21/10/2026, ver B1) · armazenamento de objetos escolhido — **ainda pendente**, e bloqueia apenas o B4.
 
 | # | Tarefa | Critério de aceitação verificável | Depende de |
 |---|---|---|---|
-| B1 | CRUD de imóveis | `code` único por organização, com erro legível na colisão; `purpose = BOTH` exige os dois preços; `AGENT` edita só os dele e recebe 404 nos outros | A12 |
+| B1 | CRUD de imóveis — *concluído em 21/10/2026* | `code` único por organização, com erro legível na colisão; `purpose = BOTH` exige os dois preços; `AGENT` edita só os dele e recebe **403** nos outros da mesma organização, 404 nos de outra | A12 |
 | B2 | Publicação | `status` e `publishedAt` independentes; publicar/despublicar registrado em auditoria | B1 |
 | B3 | Privacidade do endereço | `addressVisibility` nasce em `NEIGHBORHOOD_ONLY`; teste confirma que a API pública **não** devolve rua, número, CEP nem coordenada exata quando não deve | B1 |
 | B4 | Fotos e mídia | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
@@ -157,9 +161,9 @@ Um corretor entra, cadastra e publica imóvel, recebe lead do catálogo, agenda 
 | Domínio único ou separado para API e site | A3 | Responsável, com validação na Fase 4 |
 | Serviço de e-mail transacional | **Só produção** — A8, A9 e A10 já funcionam em dev pela porta `RemetenteDeEmail`, com `EMAIL_PROVIDER=log` | Responsável (tem custo) |
 | Armazenamento de objetos | B4 | Responsável (tem custo) |
-| Campos obrigatórios do imóvel | B1 | Responsável, com base nas entrevistas |
+| ~~Campos obrigatórios do imóvel~~ | ~~B1~~ | **Decidido em 21/10/2026**: piso do banco mais preço coerente com a finalidade. Ver `packages/shared/src/schemas/imovel.ts` |
 | Unificar leads duplicados no MVP | B5 | Responsável |
 | Mecanismo anti-spam | C6 | Responsável (custo e LGPD) |
 | Parecer jurídico sobre anonimização | D6, piloto | Advogado — **não é decisão técnica** |
 | Marca verificada no INPI e Registro.br | Qualquer uso público | Responsável |
-| Seis etapas do funil ou cinco? | A2 | Responsável — [data-model.md](data-model.md) §3.4 diz "cinco" mas lista seis nomes |
+| ~~Seis etapas do funil ou cinco?~~ | ~~A2~~ | **Seis**, confirmado em 21/10/2026: era divergência de redação, não decisão em aberto. O código já semeava seis desde o A2, e `data-model.md` §3.4 foi corrigido |

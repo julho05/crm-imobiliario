@@ -25,3 +25,4 @@ export * from './rotulos';
 export * from './primitivos';
 export * from './schemas/autenticacao';
 export * from './schemas/captura-de-lead';
+export * from './schemas/imovel';

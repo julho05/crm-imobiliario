@@ -5,11 +5,13 @@ import { AutenticacaoModule } from './autenticacao/autenticacao.module';
 import { AutorizacaoModule } from './autorizacao/autorizacao.module';
 import { EmailModule } from './email/email.module';
 import { EquipeModule } from './equipe/equipe.module';
+import { ImoveisModule } from './imoveis/imoveis.module';
 
-// O AutorizacaoModule entra aqui ainda sem rota propria: os recursos que ele
-// protege sao da Fase 2. Fica no grafo desde agora para que a injecao de
-// dependencia da guarda seja validada em toda inicializacao, e nao apenas no
-// dia em que a primeira rota protegida aparecer.
+// O AutorizacaoModule continua no grafo por conta propria, e nao so por ser
+// dependencia de quem o usa: ele nao tem rota, mas a injecao de dependencia da
+// guarda e validada em toda inicializacao por estar aqui.
+//
+// Desde o item B1 ha rota protegida de verdade — o ImoveisModule.
 @Module({
   imports: [
     PrismaModule,
@@ -17,6 +19,7 @@ import { EquipeModule } from './equipe/equipe.module';
     AutenticacaoModule,
     AutorizacaoModule,
     EquipeModule,
+    ImoveisModule,
   ],
   controllers: [HealthController],
   providers: [],

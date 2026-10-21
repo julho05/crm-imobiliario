@@ -194,9 +194,11 @@ id, organizationId, name, position, isWon, isLost, timestamps
 
 [CLAUDE.md](../CLAUDE.md) diz "funil configurado inicialmente com etapas padrão", o que implica que as etapas podem mudar. Como enum, cada imobiliária que quisesse renomear uma etapa exigiria `ALTER TABLE`. Como tabela, é seed na criação da organização.
 
-Padrão sugerido: Novo → Contato feito → Visita agendada → Proposta → Fechado (`isWon`) / Perdido (`isLost`).
+Padrão: Novo → Contato feito → Visita agendada → Proposta → Fechado (`isWon`) e Perdido (`isLost`).
 
-**[DECIDIDO 19/10/2026]** **Só o seed no MVP.** As cinco etapas são criadas junto com a organização e não há tela de edição. A escolha de tabela em vez de enum continua valendo: construir a edição depois não exige migração nem `ALTER TABLE`.
+São **seis linhas**, não cinco. `Fechado` e `Perdido` são etapas distintas — a barra na notação acima descreve dois desfechos possíveis do mesmo momento do funil, e já foi lida como se fossem uma etapa só. A lista literal está em `ETAPAS_PADRAO_DO_FUNIL`, em `packages/shared`, e é dela que o seed sai.
+
+**[DECIDIDO 19/10/2026]** **Só o seed no MVP.** As etapas são criadas junto com a organização e não há tela de edição. A escolha de tabela em vez de enum continua valendo: construir a edição depois não exige migração nem `ALTER TABLE`.
 
 **`Deal`**
 
@@ -344,7 +346,7 @@ Note que `(organizationId, assignedMemberId, …)` aparece em quase tudo: é o r
 | # | Decisão | Resposta |
 |---|---|---|
 | 1 | Deduplicar lead por telefone? | **Não.** Sinalizar possível duplicata; corretor decide |
-| 2 | Editar etapas do funil no MVP? | **Não.** Apenas o seed de cinco etapas |
+| 2 | Editar etapas do funil no MVP? | **Não.** Apenas o seed de seis etapas (§3.4) |
 | 3 | Redirecionar `slug` antigo? | **Sim.** `OrganizationSlugHistory` + redirecionamento permanente |
 | 4 | Avisar sobre endereço na descrição livre? | **Sim.** Aviso no campo quando `addressVisibility != FULL` |
 | 6 | Catálogo mostra imóvel `RESERVED`? | **Sim**, com etiqueta visível |
@@ -418,10 +420,13 @@ Esse é o comando que serve ao teste de CI proposto na §8. Hoje devolve
 
 - **Nenhuma validação de aplicação foi escrita.** As regras que o banco não
   expressa continuam apenas documentadas: um `OWNER` ativo por organização,
-  um `isCover` por imóvel, `purpose = BOTH` exigindo os dois preços, lead com
-  telefone **ou** e-mail, e a consistência do `organizationId` redundante.
+  um `isCover` por imóvel, lead com telefone **ou** e-mail, e a consistência
+  do `organizationId` redundante. **`purpose = BOTH` exigindo os dois preços
+  saiu desta lista em 21/10/2026**: está em `precoFaltandoParaAFinalidade`, em
+  `packages/shared`, aplicada na criação pelo schema e na edição sobre a
+  mesclagem com o registro (item B1).
 - **A unicidade de `Invitation`** `(organizationId, email, acceptedAt)` não
   impede dois convites pendentes: o MySQL trata `NULL` como distinto. Precisa
   ser garantida na aplicação.
-- **O seed das cinco etapas do funil** (§3.4) ainda não existe.
+- ~~**O seed das etapas do funil** (§3.4) ainda não existe.~~ **Feito em 20/10/2026**, no `POST /cadastro`, dentro da transação do item A2. A lista vive em `ETAPAS_PADRAO_DO_FUNIL`, em `packages/shared`.
 - **O teste que varre divergência de `organizationId`** (§8) ainda não existe.

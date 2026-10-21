@@ -145,3 +145,69 @@ export const paginacaoSchema = z.object({
   porPagina: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type Paginacao = z.infer<typeof paginacaoSchema>;
+
+/**
+ * As 27 unidades federativas. Lista fechada de proposito: `VarChar(2)` aceita
+ * qualquer par de letras, e "XX" numa listagem por estado nao da erro — so
+ * nunca aparece em filtro nenhum, o que e pior do que recusar na entrada.
+ */
+export const UFS_DO_BRASIL = [
+  'AC',
+  'AL',
+  'AM',
+  'AP',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MG',
+  'MS',
+  'MT',
+  'PA',
+  'PB',
+  'PE',
+  'PI',
+  'PR',
+  'RJ',
+  'RN',
+  'RO',
+  'RR',
+  'RS',
+  'SC',
+  'SE',
+  'SP',
+  'TO',
+] as const;
+
+export type Uf = (typeof UFS_DO_BRASIL)[number];
+
+/** UF normalizada em maiusculas e conferida contra `UFS_DO_BRASIL`. */
+export const ufSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .pipe(z.enum(UFS_DO_BRASIL, 'Informe uma UF valida, como SP ou MG.'));
+
+/**
+ * Converte texto livre em slug: minusculo, sem acento, palavras unidas por
+ * hifen.
+ *
+ * Nao valida nada — e transformacao, nao contrato. Quem precisa garantir a
+ * forma usa `slugSchema` depois. Devolve string vazia quando a entrada nao
+ * tem nenhum caractere aproveitavel (um titulo escrito so com emoji, por
+ * exemplo), e cabe a quem chama decidir o que fazer com isso em vez de
+ * receber um hifen solto.
+ */
+export function paraSlug(texto: string): string {
+  return (
+    texto
+      .normalize('NFD')
+      // Remove os diacriticos que o NFD separou das letras.
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  );
+}

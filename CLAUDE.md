@@ -18,7 +18,11 @@ Em 20/10/2026 a autenticação avançou até o **A10**: hash Argon2id, cadastro 
 
 Em 20/10/2026 entraram as **primeiras telas**: `/cadastro`, `/entrar`, `/recuperar-senha`, `/redefinir-senha`, `/convite` e um `/painel` provisório, em `apps/web/app/(entrada)/`. Fecham o item 1 do escopo do MVP e foram verificadas ponta a ponta pelo navegador. O `/painel` **não** é o dashboard: ele confirma a sessão, lista organizações e encerra a sessão, nada mais.
 
-Ainda não existem seed de dados nem telas de imóveis e clientes. Falta o **A11** (rate limiting), que depende de decisão sua: precisa de dependência nova ou de implementação sobre o MySQL, e a escolha muda se a hospedagem rodar mais de um processo. O critério de saída da fase é o **A12**, cujo cenário base já está montado em `apps/api/test/apoio/cenario-de-duas-organizacoes.ts` — mas ele só fecha de verdade contra endpoints de recurso, que são a Fase 2.
+Em 21/10/2026 entrou o **B1** (CRUD de imóveis), e com ele fecharam o **A12** e o **A13** — nessa ordem por necessidade, não por escolha: os dois só existem de verdade contra endpoint de recurso. Até ali a guarda estava provada por rotas que existiam somente no teste, o que mostra que o mecanismo funciona mas não que a rota de produção se lembra de chamá-lo. Agora `apps/api/test/imoveis/isolamento.http.spec.ts` faz as perguntas do `docs/permissions.md` §8.2, §8.3 e §8.4 contra `/api/imoveis`, a rota que o site usa. São **401 testes** em `npm run verify`.
+
+**A Fase 1 está fechada**, com um único item em aberto: o **A11** (rate limiting), que depende de decisão sua — dependência nova ou implementação sobre o MySQL, e a escolha muda se a hospedagem rodar mais de um processo. Ele não bloqueia a Fase 2.
+
+Ainda não existem seed de dados nem telas de imóveis e clientes: o B1 entregou a API, não a interface.
 
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 
@@ -32,6 +36,9 @@ Registradas com data em [docs/permissions.md](docs/permissions.md) §9, [docs/da
 - Sessão opaca em cookie `httpOnly` com estado no MySQL — **não** JWT
 - npm workspaces, sem Turborepo
 - A marca ainda **não** está decidida; manter o código neutro, com o nome só em `NEXT_PUBLIC_APP_NAME`
+- **Campos obrigatórios do imóvel** (21/10/2026): só o piso do banco — título, tipo, finalidade, UF, cidade, bairro — mais o preço coerente com a finalidade. Área e dormitórios são opcionais, porque campo obrigatório que o corretor ainda não sabe produz número inventado. Consequência registrada para a Fase 3: filtro por área ou dormitório tem de **excluir** o imóvel sem o valor, nunca tratá-lo como zero
+- **Código do imóvel** (21/10/2026): gerado pelo servidor (`AP-001`, sequencial por organização, prefixo pelo tipo) e **editável** — a imobiliária que já numera imóveis usa essa referência no anúncio e no WhatsApp
+- **Seis etapas no funil**, não cinco (21/10/2026): era divergência de redação em `docs/data-model.md` §3.4, já corrigida. `Fechado` e `Perdido` são etapas distintas, e o código semeia seis desde o A2
 
 ## Stack proposta
 - TypeScript em frontend e backend
@@ -145,6 +152,7 @@ Armadilhas confirmadas na prática:
 - **Nao rodar `npm run build` com `npm run dev` no ar.** O `nest build` apaga e recria o `apps/api/dist`, e o processo do `nest start --watch` perde o arquivo que estava executando: a API morre com `Cannot find module dist/main` e fica esperando mudanca de arquivo. O sintoma engana — o site responde, mas toda chamada a API volta 500, porque o proxy do Next nao acha a porta 3333. Encerrar o `dev`, buildar, e subir de novo.
 - O **Zod 4 recusa `.pick()` em runtime** quando o objeto tem refinamento (`.refine()`), mesmo compilando sem erro — o tipo diz que dá, a execução diz que não. `redefinirSenhaSchema.pick({ token: true })` passava no `tsc` e estourava ao carregar o módulo. Contrato compartilhado novo vai declarado em `packages/shared`, não derivado de um schema com refinamento.
 - **`@UseGuards(Classe)` instancia a guarda no módulo do controller**, não reaproveita a instância do módulo que a declara. As dependências dela precisam estar no alcance desse módulo. Por isso o `AutorizacaoModule` **reexporta** o `AutenticacaoModule`: o `PrismaService` chega sozinho porque o `PrismaModule` é `@Global()`, mas o `SessaoService` não. O sintoma é um `Nest can't resolve dependencies of the AutorizacaoGuard` que não aponta para a causa.
+- **`as const` num `select` do Prisma 7 quebra a inferência de relação aninhada.** O objeto fica `readonly` e o tipo do resultado perde a relação incluída — no caso, o `ownerMember` desaparecia do retorno. O erro aparece longe da causa, na função que consome o registro, reclamando de propriedade que falta. Usar `satisfies Prisma.<Modelo>Select`, que preserva os tipos literais sem tornar o objeto somente-leitura.
 - O `apps/api/test/` estava **fora** do `tsconfig.json` (que inclui só `src/**/*`), então `tsc --noEmit` nunca o verificava. Pior: o transformador do Vitest procura o `tsconfig.json` mais próximo do arquivo para saber de `experimentalDecorators`, e sem nenhum ali um controller de teste com `@Req()` falhava com "Decorators are not valid here" — erro que aparece como falha de suite, não de configuração. Resolvido com `apps/api/test/tsconfig.json`, que **precisa** ter esse nome exato, e que declara `module: esnext` porque quem carrega esses arquivos é o Vitest, como ESM, e não o `tsc` para CommonJS.
 
 ## Situação das dez entregas do briefing inicial
