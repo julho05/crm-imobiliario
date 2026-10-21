@@ -42,7 +42,13 @@ A duplicata por telefone é sinalizada em **dois níveis**, e isso merece atenç
 
 Entrou junto, por necessidade: **`GET /equipe/membros`** (nome, papel e `Membership.id`, **sem e-mail**) — o seletor de responsável não tinha de onde tirar a lista.
 
-Ainda não existem funil, agenda nem catálogo público.
+Em 21/10/2026 entrou o **B7** — funil de negociações — com API e tela. São **603 testes**.
+
+**A visibilidade herda o lead**, e isso atravessa o módulo: o recorte da listagem filtra por `lead.assignedMemberId`, e o `conferir()` recebe o responsável do **lead**, nunca o da negociação. Passar o cliente a outra pessoa passa a negociação com ele, sem ninguém tocar no registro — verificado contra o servidor. Consequência: atribuir a negociação a quem não é responsável pelo cliente é **recusado**, porque criaria um responsável que recebe 404 ao abrir o próprio registro.
+
+**Outro teste encontrou um vazamento real**, o segundo em dois dias: a listagem excluía negociação de cliente excluído, mas a consulta por id ainda devolvia o nome dele — o `carregar` filtrava só o `deletedAt` da negociação. Atendido um pedido de LGPD, o nome sobreviveria por essa porta. O filtro agora é o mesmo nos dois caminhos.
+
+Ainda não existem agenda, dashboard nem catálogo público.
 
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 

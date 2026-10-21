@@ -14,6 +14,7 @@ import {
 } from '@app/shared';
 import { Aviso } from '@/components/aviso';
 import { Campo, CampoTexto } from '@/components/campo';
+import { NegociacoesDoCliente } from '@/components/leads/negociacoes-do-cliente';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -216,6 +217,8 @@ export default function DetalheDoLead() {
           pode={podeFazer(papel, 'lead:atribuir') !== false}
           aoMudar={trocar}
         />
+
+        <NegociacoesDoCliente leadId={lead.id} papel={papel} />
 
         {podeEditar ? (
           <Dados lead={lead} aoMudar={trocar} />

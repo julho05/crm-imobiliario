@@ -110,7 +110,7 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B4 | Fotos e mídia | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
 | B5 | Leads — *concluído em 21/10/2026* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
 | B6 | Fila de não atribuídos — *concluído em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
-| B7 | Funil — *API concluída em 21/10/2026; tela pendente* | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
+| B7 | Funil — *concluído em 21/10/2026* | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
 | B8 | Agenda e tarefas | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
 | B9 | Dashboard | Conteúdo muda por papel; organização nova mostra primeiros passos, não zeros | B1, B5 |
 | B10 | Desempenho de listagem | Paginação em todas as listas; **teste que conta consultas** e falha se a listagem fizer uma por item | B1, B5 |
@@ -181,7 +181,19 @@ Decisões tomadas durante a implementação:
 
 Entrou junto: o **cenário de teste passou a criar as seis etapas do funil** em cada organização, como o `POST /cadastro` faz. Sem elas, o cenário descrevia uma organização que não pode existir.
 
-Pendente deste item: a **tela** (`/painel/funil`) e o seed, que ainda não cria negociação nenhuma.
+### Tela do funil — **concluída em 21/10/2026**
+
+`/painel/funil` e `/painel/funil/[id]`, mais a seção de negociações na ficha do cliente.
+
+Três decisões de interface:
+
+- **Não há arrastar e soltar.** Mover para a etapa de perda exige motivo e a de ganho fecha a negociação: duas consequências que pedem confirmação com espaço para explicar, não um gesto que pode ser acidental. O movimento acontece na tela da negociação. Fica registrado como escolha, não limitação — se o uso mostrar que o arrasto é esperado, ele entra com confirmação nas etapas de desfecho
+- **Os desfechos são totais, não colunas.** Negociação fechada sai da listagem do funil, então as colunas "Fechado" e "Perdido" ficariam **sempre vazias** — e duas colunas que nunca têm nada ensinam a pessoa a ignorar a tela. Elas viraram dois totais acumulados abaixo do quadro
+- **A negociação nasce na ficha do cliente.** Abrir pelo funil exigiria escolher o cliente numa lista que precisa respeitar o escopo `OWN`, recriando metade da tela de clientes dentro de um seletor
+
+Detalhe que tornou os totais possíveis: o resumo é pedido com `incluirFechadas=true` e a listagem sem. Parece contraditório e não é — negociação em etapa aberta **nunca** está fechada, porque mover para etapa aberta limpa o `closedAt`. Então incluir as fechadas não mexe nos números das colunas abertas, e é o que dá os totais reais de ganho e de perda.
+
+O seed agora cria **15 negociações** nas três organizações, espalhadas pelas seis etapas, duas delas fechadas, uma sem imóvel e uma sem valor esperado.
 
 ---
 

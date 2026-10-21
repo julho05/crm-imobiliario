@@ -125,6 +125,24 @@ type ImovelDoSeed = {
   responsavel: number | null;
 };
 
+/**
+ * Negociacao do seed.
+ *
+ * `lead` e `etapa` sao **indices e nomes**, nao identificadores: os ids so
+ * existem depois da insercao, e escrever o nome da etapa ("Proposta") deixa a
+ * lista legivel e resistente a mudanca de ordem.
+ */
+type NegociacaoDoSeed = {
+  /** Indice em `leads` da mesma organizacao. */
+  lead: number;
+  /** Nome da etapa, como em ETAPAS_PADRAO_DO_FUNIL. */
+  etapa: string;
+  /** Indice em `imoveis`, ou `null` para negociacao sem imovel definido. */
+  imovel: number | null;
+  valorEsperado?: number;
+  motivoDaPerda?: string;
+};
+
 type LeadDoSeed = {
   nomeCompleto: string;
   telefone?: string;
@@ -416,6 +434,50 @@ function leadsDaAurora(): LeadDoSeed[] {
   ];
 }
 
+/**
+ * Doze negociacoes na organizacao grande, espalhadas pelo funil.
+ *
+ * Os pontos de variacao, de novo escolhidos para que as telas possam ser
+ * conferidas:
+ *
+ * - **as seis etapas ocupadas**, para que nenhuma coluna do quadro nasca vazia
+ *   por acidente — e uma delas vazia de proposito, para ver a coluna vazia
+ * - **duas fechadas** (ganha e perdida), que **nao** aparecem no funil por
+ *   padrao e exigem o filtro de fechadas
+ * - **uma sem imovel**, que e o caso de "procuro dois quartos na zona sul"
+ * - **uma sem valor esperado**, para a coluna somar com registro ausente
+ * - **negociacoes de corretores diferentes**, para que o recorte por
+ *   responsavel do lead seja visivel ao entrar como cada um
+ */
+function negociacoesDaAurora(): NegociacaoDoSeed[] {
+  return [
+    // Do Tiago (lead 1, 2, 3): o funil dele tem quatro etapas ocupadas.
+    { lead: 0, etapa: 'Novo', imovel: 0, valorEsperado: 420_000 },
+    { lead: 1, etapa: 'Contato feito', imovel: 1, valorEsperado: 467_000 },
+    { lead: 2, etapa: 'Visita agendada', imovel: 2, valorEsperado: 514_000 },
+    { lead: 2, etapa: 'Proposta', imovel: 3, valorEsperado: 561_000 },
+    // Fechada com ganho: fora do funil por padrao.
+    { lead: 3, etapa: 'Fechado', imovel: 4, valorEsperado: 608_000 },
+    // Fechada com perda: tambem fora, e com motivo, que o contrato exige.
+    {
+      lead: 4,
+      etapa: 'Perdido',
+      imovel: 5,
+      valorEsperado: 655_000,
+      motivoDaPerda: 'Procurava em outra cidade.',
+    },
+    // Da Bianca (leads 5 a 9).
+    { lead: 5, etapa: 'Novo', imovel: 6, valorEsperado: 702_000 },
+    { lead: 6, etapa: 'Contato feito', imovel: null, valorEsperado: 350_000 },
+    // Sem valor esperado: a coluna soma com registro ausente.
+    { lead: 8, etapa: 'Proposta', imovel: 7 },
+    // Da Celina (lead 10, 11) e do Owner/Admin (12, 13).
+    { lead: 10, etapa: 'Visita agendada', imovel: 8, valorEsperado: 749_000 },
+    { lead: 12, etapa: 'Contato feito', imovel: 9, valorEsperado: 796_000 },
+    { lead: 13, etapa: 'Novo', imovel: null, valorEsperado: 843_000 },
+  ];
+}
+
 const NOME_POR_TIPO: Record<PropertyType, string> = {
   APARTMENT: 'Apartamento',
   HOUSE: 'Casa',
@@ -447,7 +509,7 @@ async function main() {
     const senhaHash = await hash(SENHA, CUSTO_DE_DESENVOLVIMENTO);
 
     console.log(
-      'Criando Imobiliaria Aurora (5 pessoas, 26 imoveis, 18 leads)...',
+      'Criando Imobiliaria Aurora (5 pessoas, 26 imoveis, 18 leads, 12 negociacoes)...',
     );
     const aurora = await criarOrganizacao(prisma, {
       nome: 'Imobiliaria Aurora',
@@ -457,9 +519,12 @@ async function main() {
       senhaHash,
       imoveis: imoveisDaAurora(),
       leads: leadsDaAurora(),
+      negociacoes: negociacoesDaAurora(),
     });
 
-    console.log('Criando Meridiano Imoveis (2 pessoas, 4 imoveis, 4 leads)...');
+    console.log(
+      'Criando Meridiano Imoveis (2 pessoas, 4 imoveis, 4 leads, 2 negociacoes)...',
+    );
     await criarOrganizacao(prisma, {
       nome: 'Meridiano Imoveis',
       slug: 'meridiano',
@@ -562,9 +627,15 @@ async function main() {
           responsavel: 1,
         },
       ],
+      negociacoes: [
+        { lead: 0, etapa: 'Proposta', imovel: 0, valorEsperado: 1_190_000 },
+        { lead: 1, etapa: 'Contato feito', imovel: 1, valorEsperado: 88_800 },
+      ],
     });
 
-    console.log('Criando corretor autonomo (1 pessoa, 3 imoveis, 2 leads)...');
+    console.log(
+      'Criando corretor autonomo (1 pessoa, 3 imoveis, 2 leads, 1 negociacao)...',
+    );
     await criarOrganizacao(prisma, {
       nome: 'Paulo Reis Imoveis',
       slug: 'paulo-reis',
@@ -638,6 +709,14 @@ async function main() {
           origem: 'REFERRAL',
           status: 'NEW',
           responsavel: 0,
+        },
+      ],
+      negociacoes: [
+        {
+          lead: 0,
+          etapa: 'Visita agendada',
+          imovel: 1,
+          valorEsperado: 540_000,
         },
       ],
     });
@@ -776,6 +855,7 @@ async function criarOrganizacao(
     senhaHash: string;
     imoveis: ImovelDoSeed[];
     leads?: LeadDoSeed[];
+    negociacoes?: NegociacaoDoSeed[];
   },
 ): Promise<string> {
   const organizacao = await prisma.organization.create({
@@ -822,6 +902,7 @@ async function criarOrganizacao(
   }
 
   const contadorPorTipo = new Map<PropertyType, number>();
+  const idsDeImoveis: string[] = [];
 
   for (const imovel of dados.imoveis) {
     const proximo = (contadorPorTipo.get(imovel.tipo) ?? 0) + 1;
@@ -829,7 +910,8 @@ async function criarOrganizacao(
 
     const codigo = `${PREFIXO_POR_TIPO[imovel.tipo]}-${String(proximo).padStart(3, '0')}`;
 
-    await prisma.property.create({
+    const imovelCriado = await prisma.property.create({
+      select: { id: true },
       data: {
         organizationId: organizacao.id,
         code: codigo,
@@ -857,10 +939,15 @@ async function criarOrganizacao(
           imovel.responsavel === null ? null : vinculos[imovel.responsavel],
       },
     });
+
+    idsDeImoveis.push(imovelCriado.id);
   }
 
+  const idsDeLeads: string[] = [];
+
   for (const lead of dados.leads ?? []) {
-    await prisma.lead.create({
+    const leadCriado = await prisma.lead.create({
+      select: { id: true },
       data: {
         organizationId: organizacao.id,
         fullName: lead.nomeCompleto,
@@ -885,23 +972,108 @@ async function criarOrganizacao(
           : {}),
       },
     });
+
+    idsDeLeads.push(leadCriado.id);
   }
+
+  await criarNegociacoes(prisma, {
+    organizationId: organizacao.id,
+    negociacoes: dados.negociacoes ?? [],
+    idsDeLeads,
+    idsDeImoveis,
+  });
 
   return organizacao.id;
 }
 
+/**
+ * As negociacoes, depois dos leads e dos imoveis.
+ *
+ * Precisa vir depois porque referencia os dois, e os ids so existem apos a
+ * insercao. Carrega as etapas por nome, numa consulta so — nao uma por
+ * negociacao.
+ */
+async function criarNegociacoes(
+  prisma: PrismaClient,
+  dados: {
+    organizationId: string;
+    negociacoes: NegociacaoDoSeed[];
+    idsDeLeads: string[];
+    idsDeImoveis: string[];
+  },
+): Promise<void> {
+  if (dados.negociacoes.length === 0) {
+    return;
+  }
+
+  const etapas = await prisma.pipelineStage.findMany({
+    where: { organizationId: dados.organizationId },
+    select: { id: true, name: true, isWon: true, isLost: true },
+  });
+
+  const porNome = new Map(etapas.map((etapa) => [etapa.name, etapa]));
+
+  for (const negociacao of dados.negociacoes) {
+    const etapa = porNome.get(negociacao.etapa);
+
+    if (!etapa) {
+      throw new Error(
+        `Etapa "${negociacao.etapa}" nao existe. Confira ETAPAS_PADRAO_DO_FUNIL.`,
+      );
+    }
+
+    const leadId = dados.idsDeLeads[negociacao.lead];
+
+    if (!leadId) {
+      throw new Error(
+        `Negociacao aponta para o lead ${negociacao.lead}, que nao existe nesta organizacao.`,
+      );
+    }
+
+    // Quem responde pelo lead responde pela negociacao: e o unico valor que
+    // mantem "quem conduz" e "quem enxerga" coerentes, como o servico faz.
+    const lead = await prisma.lead.findUniqueOrThrow({
+      where: { id: leadId },
+      select: { assignedMemberId: true },
+    });
+
+    const fechada = etapa.isWon || etapa.isLost;
+
+    await prisma.deal.create({
+      data: {
+        organizationId: dados.organizationId,
+        leadId,
+        propertyId:
+          negociacao.imovel === null
+            ? null
+            : dados.idsDeImoveis[negociacao.imovel],
+        stageId: etapa.id,
+        assignedMemberId: lead.assignedMemberId,
+        expectedAmount: negociacao.valorEsperado,
+        // Derivado da etapa, como na API: etapa de ganho ou perda fecha.
+        closedAt: fechada ? new Date() : null,
+        lostReason: etapa.isLost ? negociacao.motivoDaPerda : null,
+      },
+    });
+  }
+}
+
 function imprimirResumo(): void {
   const linhas = [
-    ['Imobiliaria Aurora', '26 im./18 leads', '3 leads na fila a distribuir'],
+    [
+      'Imobiliaria Aurora',
+      '26 im./18 leads',
+      '12 negociacoes · 3 leads na fila',
+    ],
     ['  helena@exemplo.com', 'OWNER', 've e edita tudo, exclui'],
     ['  rafael@exemplo.com', 'ADMIN', 've e edita tudo, exclui'],
     ['  celina@exemplo.com', 'MANAGER', 've e edita tudo, NAO exclui'],
     ['  tiago@exemplo.com', 'AGENT', '5 leads; ve so os dele'],
     ['  bianca@exemplo.com', 'AGENT', '5 leads; ve so os dela'],
-    ['Meridiano Imoveis', '4 im./4 leads', '1 lead na fila'],
+    ['Meridiano Imoveis', '4 im./4 leads', '2 negociacoes · 1 lead na fila'],
     ['  otavio@exemplo.com', 'OWNER', ''],
     ['  dora@exemplo.com', 'AGENT', 'tambem e AGENT na Aurora'],
-    ['Paulo Reis Imoveis', '3 im./2 leads', 'corretor autonomo'],
+    ['Paulo Reis Imoveis', '3 im./2 leads', '1 negociacao · corretor autonomo'],
     ['  paulo@exemplo.com', 'OWNER', 'organizacao de um membro'],
   ];
 
