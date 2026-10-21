@@ -26,3 +26,4 @@ export * from './primitivos';
 export * from './schemas/autenticacao';
 export * from './schemas/captura-de-lead';
 export * from './schemas/imovel';
+export * from './schemas/lead';

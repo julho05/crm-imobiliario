@@ -108,8 +108,8 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B2 | Publicação — *concluído em 21/10/2026* | `status` e `publishedAt` independentes; publicar/despublicar registrado em auditoria | B1 |
 | B3 | Privacidade do endereço | `addressVisibility` nasce em `NEIGHBORHOOD_ONLY`; teste confirma que a API pública **não** devolve rua, número, CEP nem coordenada exata quando não deve | B1 |
 | B4 | Fotos e mídia | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
-| B5 | Leads | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
-| B6 | Fila de não atribuídos | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
+| B5 | Leads — *API concluída em 21/10/2026; telas pendentes* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
+| B6 | Fila de não atribuídos — *API concluída em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
 | B7 | Funil | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
 | B8 | Agenda e tarefas | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
 | B9 | Dashboard | Conteúdo muda por papel; organização nova mostra primeiros passos, não zeros | B1, B5 |
@@ -134,6 +134,22 @@ Duas pontas soltas, fechadas no mesmo dia:
 O que **não** entrou: fotos (B4, depende do armazenamento de objetos).
 
 **Verificação.** A API tem 421 testes. As telas foram conferidas por tipo, lint e build, e o percurso cadastro → imóvel → publicação foi exercitado contra o servidor em execução. **Não há teste de componente no site** — decisão de 21/10/2026, para não acrescentar `@testing-library/react` e `jsdom` agora. A consequência é concreta: a lógica do formulário (erro por campo, preço por finalidade, vazio que apaga na edição) não tem rede de proteção automatizada.
+
+### Leads — API **concluída em 21/10/2026**
+
+Sete rotas em `/api/leads`, com 87 testes. O item B6 (fila de não atribuídos) saiu junto, porque é o mesmo recorte de visibilidade com o sinal invertido.
+
+**A inversão em relação a imóveis é o que define este item.** `imovel:ver` é `ORG` para os quatro papéis; `lead:ver` é **`OWN`** para o corretor. Consequência: o imóvel do colega responde **403** ao ser editado, e o lead do colega responde **404**. Mesma pessoa, mesmo papel, mesma organização, códigos diferentes — e quem decide isso é a matriz, pelo `AutorizacaoService`, sem lista escrita à mão.
+
+Decisões tomadas durante a implementação:
+
+- **O lead nasce atribuído a quem cadastrou**, inclusive para `MANAGER` e acima. Para o `AGENT` é o que a matriz manda; para os outros a matriz não dizia, e deixá-lo sem responsável faria o contato que o gerente acabou de atender pelo telefone aparecer na fila como se ninguém o tivesse visto. Devolver à fila é um clique (`responsavel: null`)
+- **A duplicata é sinalizada em dois níveis.** Duplicata no alcance de quem cadastra vem com nome e responsável; duplicata de um colega vem apenas como `{ nivel: 'restrita' }`, sem nome e sem responsável. Sem esse recorte, a busca por telefone no cadastro vazaria a carteira do colega — o vazamento indireto que §8.2 manda testar. O nível `restrita` ainda revela *que* alguém tem aquele telefone: é troca deliberada, porque sem aviso nenhum dois corretores ligam para a mesma pessoa no mesmo dia
+- **`origem` não é editável.** Ela registra como o contato chegou, e editável transformaria o relatório de origem em opinião. `PUBLIC_CATALOG` é recusada no cadastro manual: só a vitrine a produz
+- **A fila não tem rota própria**: é o filtro `naoAtribuidos=true`, com a permissão conferida no serviço. Duas rotas lendo a mesma tabela duplicariam recorte, paginação e busca, e um dia só uma ganharia um filtro novo
+- **Pedir a fila sem `lead:verNaoAtribuidos` responde 403**, e não lista vazia: lista vazia mostraria uma fila em ordem onde há uma recusa
+
+Pendente deste item: as **telas** (`/painel/leads`, `/painel/leads/a-distribuir`, `/painel/leads/[id]`) e o seed, que ainda não cria lead nenhum.
 
 ---
 
