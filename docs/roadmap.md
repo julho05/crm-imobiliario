@@ -110,7 +110,7 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B4 | Fotos e mídia | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
 | B5 | Leads — *concluído em 21/10/2026* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
 | B6 | Fila de não atribuídos — *concluído em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
-| B7 | Funil | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
+| B7 | Funil — *API concluída em 21/10/2026; tela pendente* | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
 | B8 | Agenda e tarefas | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
 | B9 | Dashboard | Conteúdo muda por papel; organização nova mostra primeiros passos, não zeros | B1, B5 |
 | B10 | Desempenho de listagem | Paginação em todas as listas; **teste que conta consultas** e falha se a listagem fizer uma por item | B1, B5 |
@@ -162,6 +162,26 @@ Três decisões de interface vale registrar:
 Entrou junto, por necessidade: **`GET /equipe/membros`** (nome, papel e `Membership.id`, **sem e-mail**). O seletor de responsável não tinha de onde tirar a lista, então o `POST /leads/:id/responsavel` existia sem interface possível. Sem e-mail porque §4.4 dá ao `AGENT` acesso a "nome e papel" dos colegas, não à agenda de contatos da imobiliária.
 
 O seed agora cria **24 leads** nas três organizações, com os pontos de variação que as telas precisam: quatro na fila, dois com o mesmo telefone, um só com e-mail, consentimento registrado em quem veio da vitrine, e as cinco situações.
+
+### Funil — API **concluída em 21/10/2026**
+
+Oito rotas em `/api/negociacoes`, com 71 testes.
+
+**A visibilidade herda o lead**, e isso atravessa o módulo inteiro: o recorte da listagem filtra por `lead.assignedMemberId`, e o `conferir()` recebe o responsável do **lead**, nunca o da negociação. O motivo está no `schema.prisma` desde o início — "senão o funil vaza nome de cliente de colega". A negociação carrega o nome do cliente, então mostrá-la a quem não alcança o lead entregaria a carteira por outra porta.
+
+Decisões tomadas durante a implementação:
+
+- **Atribuir a negociação a quem não é responsável pelo cliente é recusado.** `Deal.assignedMemberId` existe (quem conduz o negócio), mas não decide quem vê. Permitir criaria um responsável que recebe 404 ao abrir o próprio registro. Para passar a negociação, passa-se o cliente — e quem pode fazer os dois é o mesmo papel
+- **`closedAt` é derivado da etapa**, nunca enviado: etapa de ganho ou perda fecha, etapa aberta reabre e limpa o motivo da perda. Como campo editável, a interface poderia produzir "fechada e na etapa de proposta"
+- **O motivo da perda é obrigatório** ao mover para uma etapa de perda. É o único campo do funil que responde "por que não fechamos?", e a validação é do servidor porque as etapas são linhas: o schema não tem como saber o que `etapaId` significa
+- **Fechadas ficam fora da listagem por padrão.** O funil é ferramenta do presente, e a coluna de ganhos de dois anos cresce para sempre
+- **Existe `GET /negociacoes/resumo`** com contagem e valor por etapa, respeitando o mesmo recorte de visibilidade. Somar no cliente daria o total da página, não da etapa — número errado de um jeito difícil de notar
+
+**Um teste encontrou um vazamento real.** A listagem excluía negociação de cliente excluído, mas a consulta por id ainda devolvia o nome dele: o `carregar` filtrava só o `deletedAt` da negociação. Atendido um pedido de exclusão de LGPD, o nome sobreviveria por essa porta. Corrigido, e o filtro agora é o mesmo nos dois caminhos.
+
+Entrou junto: o **cenário de teste passou a criar as seis etapas do funil** em cada organização, como o `POST /cadastro` faz. Sem elas, o cenário descrevia uma organização que não pode existir.
+
+Pendente deste item: a **tela** (`/painel/funil`) e o seed, que ainda não cria negociação nenhuma.
 
 ---
 

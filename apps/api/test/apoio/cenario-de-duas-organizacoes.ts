@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { ETAPAS_PADRAO_DO_FUNIL } from '@app/shared';
 import type { PrismaClient } from '../../src/generated/prisma/client';
 import { hashDoToken } from '../../src/autenticacao/sessao.service';
 
@@ -60,6 +61,24 @@ export type Cenario = {
   leadDeA1: string;
   leadDeA2: string;
   leadDeB: string;
+  /**
+   * As seis etapas do funil de cada organizacao, na ordem de `position`.
+   *
+   * Existem aqui porque toda organizacao as recebe no `POST /cadastro`, dentro
+   * da transacao do item A2 — um cenario sem elas descreveria uma organizacao
+   * que nao pode existir, e os testes do funil (item B7) partiriam de um estado
+   * impossivel.
+   */
+  etapasDeA: EtapaDeTeste[];
+  etapasDeB: EtapaDeTeste[];
+};
+
+export type EtapaDeTeste = {
+  id: string;
+  nome: string;
+  posicao: number;
+  isWon: boolean;
+  isLost: boolean;
 };
 
 export async function montarCenario(prisma: PrismaClient): Promise<Cenario> {
@@ -142,6 +161,9 @@ export async function montarCenario(prisma: PrismaClient): Promise<Cenario> {
     ownerMemberId: agenteB1.membershipId,
   });
 
+  const etapasDeA = await criarEtapas(prisma, organizacaoA);
+  const etapasDeB = await criarEtapas(prisma, organizacaoB);
+
   const leadDeA1 = await criarLead(prisma, {
     organizationId: organizacaoA,
     fullName: 'Cliente do A1',
@@ -175,7 +197,45 @@ export async function montarCenario(prisma: PrismaClient): Promise<Cenario> {
     leadDeA1,
     leadDeA2,
     leadDeB,
+    etapasDeA,
+    etapasDeB,
   };
+}
+
+/**
+ * As seis etapas padrao, da mesma lista que o cadastro usa.
+ *
+ * Usa `ETAPAS_PADRAO_DO_FUNIL` de proposito, e nao uma copia: se um dia a
+ * lista mudar, estes testes mudam junto, em vez de validar um funil que a
+ * aplicacao real nao cria.
+ */
+async function criarEtapas(
+  prisma: PrismaClient,
+  organizationId: string,
+): Promise<EtapaDeTeste[]> {
+  await prisma.pipelineStage.createMany({
+    data: ETAPAS_PADRAO_DO_FUNIL.map((etapa) => ({
+      organizationId,
+      name: etapa.nome,
+      position: etapa.posicao,
+      isWon: etapa.isWon,
+      isLost: etapa.isLost,
+    })),
+  });
+
+  const etapas = await prisma.pipelineStage.findMany({
+    where: { organizationId },
+    select: { id: true, name: true, position: true, isWon: true, isLost: true },
+    orderBy: { position: 'asc' },
+  });
+
+  return etapas.map((etapa) => ({
+    id: etapa.id,
+    nome: etapa.name,
+    posicao: etapa.position,
+    isWon: etapa.isWon,
+    isLost: etapa.isLost,
+  }));
 }
 
 async function criarOrganizacao(
