@@ -96,6 +96,29 @@ export class ImoveisController {
     return this.imoveis.atualizar(requisicao.autorizacao, id, dados);
   }
 
+  /**
+   * Item B2. `POST`, e nao `PATCH` no `status`: publicar e um **evento**, com
+   * regra propria e linha de auditoria propria. Expor `status` e `publishedAt`
+   * como campos editaveis deixaria a interface combinar estados que o negocio
+   * nao admite — imovel vendido e anunciado ao mesmo tempo, por exemplo.
+   */
+  @Post(':id/publicar')
+  @HttpCode(200)
+  @Exige('imovel:publicar')
+  publicar(@Req() requisicao: RequisicaoAutorizada, @Param('id') id: string) {
+    return this.imoveis.publicar(requisicao.autorizacao, id);
+  }
+
+  @Post(':id/despublicar')
+  @HttpCode(200)
+  @Exige('imovel:publicar')
+  despublicar(
+    @Req() requisicao: RequisicaoAutorizada,
+    @Param('id') id: string,
+  ) {
+    return this.imoveis.despublicar(requisicao.autorizacao, id);
+  }
+
   @Delete(':id')
   @Exige('imovel:excluir')
   excluir(@Req() requisicao: RequisicaoAutorizada, @Param('id') id: string) {

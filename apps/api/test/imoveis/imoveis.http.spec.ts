@@ -51,6 +51,7 @@ type RespostaDeImovel = {
   precoDeAluguel: number | null;
   condominio: number | null;
   estado: string;
+  visibilidadeDoEndereco: string;
   responsavel: { membershipId: string; nome: string } | null;
 };
 
@@ -159,6 +160,27 @@ describe('cadastro', () => {
     });
 
     expect(noBanco.organizationId).toBe(cenario.organizacaoA);
+  });
+
+  it('aceita a visibilidade do endereço, e o padrão restritivo vale sem ela', async () => {
+    const comEscolha = await criarEObter(cenario.agenteA1.cookie, {
+      visibilidadeDoEndereco: 'FULL',
+    });
+
+    expect(comEscolha.visibilidadeDoEndereco).toBe('FULL');
+
+    // Omitir nunca abre o endereço: o esquecimento erra para o lado seguro.
+    const semEscolha = await criarEObter(cenario.agenteA1.cookie);
+
+    expect(semEscolha.visibilidadeDoEndereco).toBe('NEIGHBORHOOD_ONLY');
+  });
+
+  it('recusa visibilidade de endereço inventada', async () => {
+    const resposta = await criar(cenario.agenteA1.cookie, {
+      visibilidadeDoEndereco: 'TUDO',
+    });
+
+    expect(resposta.status).toBe(400);
   });
 
   it('recusa quem não tem sessão', async () => {

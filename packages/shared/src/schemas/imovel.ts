@@ -34,7 +34,7 @@
  */
 
 import { z } from 'zod';
-import { PropertyPurpose, PropertyType } from '../enums';
+import { AddressVisibility, PropertyPurpose, PropertyType } from '../enums';
 import { ufSchema } from '../primitivos';
 
 /**
@@ -142,6 +142,19 @@ const camposDoImovel = z.object({
     .string()
     .trim()
     .max(191, 'Complemento muito longo.')
+    .optional(),
+
+  /**
+   * Quanto do endereco o catalogo publico mostra.
+   *
+   * Aceito na entrada, ao contrario de `status` e `ownerMemberId`, porque e
+   * **decisao de quem cadastra** e precisa estar no formulario: o proprietario
+   * que pediu discricao e o caso comum, nao a excecao. O padrao restritivo
+   * continua no banco (`NEIGHBORHOOD_ONLY`), entao omitir o campo nunca abre
+   * o endereco — o esquecimento erra para o lado seguro.
+   */
+  visibilidadeDoEndereco: z
+    .enum(AddressVisibility, 'Selecione o que o publico vera do endereco.')
     .optional(),
 });
 

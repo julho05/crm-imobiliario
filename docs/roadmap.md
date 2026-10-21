@@ -105,7 +105,7 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | # | Tarefa | Critério de aceitação verificável | Depende de |
 |---|---|---|---|
 | B1 | CRUD de imóveis — *concluído em 21/10/2026* | `code` único por organização, com erro legível na colisão; `purpose = BOTH` exige os dois preços; `AGENT` edita só os dele e recebe **403** nos outros da mesma organização, 404 nos de outra | A12 |
-| B2 | Publicação | `status` e `publishedAt` independentes; publicar/despublicar registrado em auditoria | B1 |
+| B2 | Publicação — *concluído em 21/10/2026* | `status` e `publishedAt` independentes; publicar/despublicar registrado em auditoria | B1 |
 | B3 | Privacidade do endereço | `addressVisibility` nasce em `NEIGHBORHOOD_ONLY`; teste confirma que a API pública **não** devolve rua, número, CEP nem coordenada exata quando não deve | B1 |
 | B4 | Fotos e mídia | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
 | B5 | Leads | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
@@ -114,6 +114,19 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B8 | Agenda e tarefas | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
 | B9 | Dashboard | Conteúdo muda por papel; organização nova mostra primeiros passos, não zeros | B1, B5 |
 | B10 | Desempenho de listagem | Paginação em todas as listas; **teste que conta consultas** e falha se a listagem fizer uma por item | B1, B5 |
+
+### Telas de imóveis — **concluído em 21/10/2026**
+
+Entraram junto com o B2, em `apps/web/app/painel/`:
+
+- **Layout do painel** com navegação por papel, seletor de organização ativa (só para quem tem mais de um vínculo), alternância de tema e encerramento de sessão. A sessão é carregada **uma vez** pelo layout e oferecida por contexto; a regra "401 leva para `/entrar`" existe num lugar só
+- **Lista** com busca, filtros, paginação e alternância "Todos / Meus imóveis", com os dois estados vazios que o §8 do mapa de telas distingue
+- **Formulário** de cadastro e edição em cinco seções, com o controle de `addressVisibility` visível e explicado, e o aviso no campo de descrição quando o endereço não é `FULL`
+- **Publicar e tirar do ar**, e exclusão com confirmação em duas etapas
+
+O que **não** entrou: fotos (B4, depende do armazenamento de objetos) e mudança de estado comercial para `RESERVED`, `SOLD` ou `RENTED` — hoje o estado só vai de `DRAFT` para `AVAILABLE`, na publicação. Sem isso o item C1 do catálogo não tem como mostrar a etiqueta de reservado, e a tarefa precisa de dono: ver as pendências no fim deste documento.
+
+**Verificação.** A API tem 421 testes. As telas foram conferidas por tipo, lint e build, e o percurso cadastro → imóvel → publicação foi exercitado contra o servidor em execução. **Não há teste de componente no site** — decisão de 21/10/2026, para não acrescentar `@testing-library/react` e `jsdom` agora. A consequência é concreta: a lógica do formulário (erro por campo, preço por finalidade, vazio que apaga na edição) não tem rede de proteção automatizada.
 
 ---
 
@@ -163,6 +176,7 @@ Um corretor entra, cadastra e publica imóvel, recebe lead do catálogo, agenda 
 | Armazenamento de objetos | B4 | Responsável (tem custo) |
 | ~~Campos obrigatórios do imóvel~~ | ~~B1~~ | **Decidido em 21/10/2026**: piso do banco mais preço coerente com a finalidade. Ver `packages/shared/src/schemas/imovel.ts` |
 | Unificar leads duplicados no MVP | B5 | Responsável |
+| Estado comercial do imóvel (`RESERVED`, `SOLD`, `RENTED`) — onde entra? | C1 (etiqueta de reservado) | Responsável. O B1 e o B2 não cobrem: publicar leva `DRAFT` a `AVAILABLE` e nada mais muda o estado |
 | Mecanismo anti-spam | C6 | Responsável (custo e LGPD) |
 | Parecer jurídico sobre anonimização | D6, piloto | Advogado — **não é decisão técnica** |
 | Marca verificada no INPI e Registro.br | Qualquer uso público | Responsável |

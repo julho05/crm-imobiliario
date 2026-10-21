@@ -170,6 +170,11 @@ A barra lateral mostra apenas o que o papel alcança. **Esconder item de menu n�
 
 O seletor de organização ativa aparece **somente** para quem tem mais de um `Membership` ativo. Para o corretor autônomo, que é a maioria, um seletor com uma opção só é ruído.
 
+**Construído em 21/10/2026**, em `apps/web/components/painel/navegacao.tsx`. Duas diferenças em relação à tabela acima, ambas deliberadas:
+
+1. **O menu lista só o que existe** — hoje painel e imóveis. Item que leva a tela vazia ou a 404 ensina a pessoa a não confiar na navegação, e é pior do que menu curto.
+2. **Quem decide a visibilidade é a matriz**, pela mesma `podeFazer()` que a guarda da API consulta, e não uma lista escrita à mão aqui. Lista própria divergiria da matriz no primeiro ajuste de permissão, e divergiria em silêncio.
+
 ### `/painel` — dashboard
 
 **[PROPOSTA]** O conteúdo muda com o papel, porque o que é urgente muda com o papel.
@@ -201,7 +206,11 @@ Dois pontos onde a tela precisa proteger o cliente:
 
 `purpose = BOTH` exige preço de venda **e** de aluguel. `code` é único por organização, e o erro precisa dizer qual código já existe.
 
-**[DECIDIR]** Quais campos são obrigatórios? [product.md](product.md) marca isso como pendente para a Fase 2. Sem a resposta, a tela não pode ser construída por inteiro.
+**[DECIDIDO 21/10/2026]** Obrigatórios: título, tipo, finalidade, UF, cidade, bairro e o preço coerente com a finalidade. Área e dormitórios ficam **opcionais** — campo obrigatório que o corretor ainda não sabe produz número inventado, pior para o filtro do que o campo vazio, porque o vazio se detecta e o errado não. O contrato está em `packages/shared/src/schemas/imovel.ts`.
+
+Consequência para o item C4: filtro por área ou por dormitórios tem de **excluir** o imóvel sem o valor, nunca tratá-lo como zero.
+
+**Construído em 21/10/2026**, menos a aba de fotos. O código de referência é gerado (`AP-001`, sequencial por organização, prefixo pelo tipo) e pode ser sobrescrito — a imobiliária que já numera imóveis usa essa referência no anúncio.
 
 ### `/painel/imoveis/[id]/fotos`
 

@@ -7,7 +7,9 @@ import {
   type EntradaDeCriarImovel,
   type FiltrosDeImoveis,
   type Paginacao,
+  type AddressVisibility,
   type PropertyPurpose,
+  type PropertyStatus,
   type PropertyType,
 } from '@app/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -348,6 +350,124 @@ export class ImoveisService {
   }
 
   /**
+   * Coloca o imovel no ar — item **B2**.
+   *
+   * ## `status` e `publishedAt` sao coisas diferentes
+   *
+   * O `schema.prisma` ja anotava a distincao, e aqui ela vira comportamento:
+   * `status` e o **estado comercial** (disponivel, reservado, vendido) e
+   * `publishedAt` e a **visibilidade** no catalogo. Um imovel reservado
+   * continua anunciado, com etiqueta (item C1); um imovel disponivel pode
+   * estar fora do ar porque o proprietario pediu discricao.
+   *
+   * Por isso publicar grava `publishedAt` e **nao** mexe no `status`, com uma
+   * excecao: `DRAFT` significa "ainda nao terminei", e nao faria sentido
+   * anunciar algo que a propria pessoa marcou como rascunho. Nesse caso o
+   * estado vira `AVAILABLE` junto, e a auditoria registra que mudou.
+   *
+   * ## Onde o imovel incoerente e barrado
+   *
+   * Aqui. O item B1 tolera `SALE` sem preco em registro que ja existia no
+   * banco (ver `recusarSeOPrecoNaoCombinaComAFinalidade`), porque recusar a
+   * edicao de um bairro por causa disso apontaria para um campo que a pessoa
+   * nao tocou. Mas anuncio sem preco nao vai ao ar: e o visitante do catalogo
+   * que pagaria por essa tolerancia.
+   */
+  async publicar(
+    contexto: ContextoAutorizado,
+    id: string,
+  ): Promise<RespostaDeImovel> {
+    const carregado = await this.carregar(contexto, id);
+
+    const imovel = this.autorizacao.conferir(contexto, carregado, {
+      responsavelId: carregado?.ownerMemberId ?? null,
+    });
+
+    this.recusarSePublicacaoNaoFazSentido(imovel);
+
+    const viraDisponivel = imovel.status === 'DRAFT';
+
+    return this.prisma.$transaction(async (tx) => {
+      const publicado = await tx.property.update({
+        where: { id: imovel.id },
+        data: {
+          publishedAt: new Date(),
+          ...(viraDisponivel ? { status: 'AVAILABLE' } : {}),
+        },
+        select: SELECAO_DE_IMOVEL,
+      });
+
+      await this.autorizacao.registrar(
+        contexto,
+        {
+          entityType: 'Property',
+          entityId: imovel.id,
+          action: 'imovel.publicado',
+          metadata: {
+            codigo: imovel.code,
+            // Registra se a publicacao tambem mudou o estado comercial: sem
+            // isto, o log nao distingue "coloquei no ar" de "coloquei no ar e
+            // marquei como disponivel".
+            statusAnterior: imovel.status,
+            virouDisponivel: viraDisponivel,
+          },
+        },
+        tx,
+      );
+
+      return paraRespostaDeImovel(publicado);
+    });
+  }
+
+  /**
+   * Tira o imovel do ar, sem mexer no estado comercial.
+   *
+   * O `status` fica como estava de proposito: despublicar e dizer "nao mostre
+   * mais", nao "nao esta mais disponivel". Quem tira do ar um imovel
+   * `AVAILABLE` costuma querer justamente que ele continue disponivel para a
+   * carteira interna — e voltar a publicar nao deveria exigir reconfigurar o
+   * estado.
+   */
+  async despublicar(
+    contexto: ContextoAutorizado,
+    id: string,
+  ): Promise<RespostaDeImovel> {
+    const carregado = await this.carregar(contexto, id);
+
+    const imovel = this.autorizacao.conferir(contexto, carregado, {
+      responsavelId: carregado?.ownerMemberId ?? null,
+    });
+
+    if (imovel.publishedAt === null) {
+      // Idempotente seria mais simples, mas esconderia da interface que o
+      // botao nao fazia o que ela pensava — e a tela que mostra "publicar"
+      // para um imovel ja fora do ar esta desatualizada e precisa recarregar.
+      throw new BadRequestException('Este imovel nao esta publicado.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const despublicado = await tx.property.update({
+        where: { id: imovel.id },
+        data: { publishedAt: null },
+        select: SELECAO_DE_IMOVEL,
+      });
+
+      await this.autorizacao.registrar(
+        contexto,
+        {
+          entityType: 'Property',
+          entityId: imovel.id,
+          action: 'imovel.despublicado',
+          metadata: { codigo: imovel.code, status: imovel.status },
+        },
+        tx,
+      );
+
+      return paraRespostaDeImovel(despublicado);
+    });
+  }
+
+  /**
    * Exclusao **logica**: grava `deletedAt` e tira o imovel das listas.
    *
    * A linha fica. `Inquiry`, `Deal` e `Visit` apontam para ela, e apagar de
@@ -399,6 +519,57 @@ export class ImoveisService {
       where: { id, organizationId: contexto.organizationId, deletedAt: null },
       select: SELECAO_DE_IMOVEL,
     });
+  }
+
+  /**
+   * O imovel pode ir ao ar?
+   *
+   * Duas recusas, por motivos diferentes:
+   *
+   * 1. **Estado comercial encerrado** (`SOLD`, `RENTED`) ou desativado
+   *    (`INACTIVE`). Anunciar um imovel vendido gera lead que nasce frustrado,
+   *    e e o tipo de erro que a imobiliaria descobre pelo cliente irritado.
+   * 2. **Preco faltando para a finalidade.** O B1 tolera isso em registro que
+   *    ja estava no banco; a vitrine nao. Anuncio sem preco faz o visitante
+   *    pedir contato para descobrir um numero que deveria estar na tela.
+   *
+   * A mensagem e especifica nos dois casos, e isso e deliberado: aqui nao ha
+   * nada a esconder — quem pede a publicacao e membro da organizacao, com
+   * permissao para publicar aquele imovel, e precisa saber o que corrigir.
+   */
+  private recusarSePublicacaoNaoFazSentido(imovel: {
+    status: PropertyStatus;
+    purpose: PropertyPurpose;
+    price: unknown;
+    rentPrice: unknown;
+  }): void {
+    const MOTIVO_POR_STATUS: Partial<Record<PropertyStatus, string>> = {
+      SOLD: 'Este imovel esta marcado como vendido e nao pode ser publicado.',
+      RENTED: 'Este imovel esta marcado como alugado e nao pode ser publicado.',
+      INACTIVE: 'Este imovel esta inativo. Reative-o antes de publicar.',
+    };
+
+    const impedimento = MOTIVO_POR_STATUS[imovel.status];
+
+    if (impedimento) {
+      throw new BadRequestException(impedimento);
+    }
+
+    const faltando = precoFaltandoParaAFinalidade({
+      finalidade: imovel.purpose,
+      preco: imovel.price === null ? null : Number(imovel.price),
+      precoDeAluguel:
+        imovel.rentPrice === null ? null : Number(imovel.rentPrice),
+    });
+
+    if (faltando) {
+      throw new BadRequestException({
+        mensagem: 'Dados invalidos.',
+        erros: [
+          { campo: faltando, mensagem: mensagemDePrecoFaltando(faltando) },
+        ],
+      });
+    }
   }
 
   /**
@@ -504,6 +675,10 @@ export class ImoveisService {
       street: dados.rua,
       number: dados.numero,
       complement: dados.complemento,
+      // Omitido na criacao, o banco aplica `NEIGHBORHOOD_ONLY`: o padrao
+      // restritivo e o que impede vazamento por esquecimento.
+      addressVisibility: dados.visibilidadeDoEndereco as
+        AddressVisibility | undefined,
     };
   }
 
