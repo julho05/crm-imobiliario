@@ -64,6 +64,9 @@ Registradas com data em [docs/permissions.md](docs/permissions.md) §9, [docs/da
 - A marca ainda **não** está decidida; manter o código neutro, com o nome só em `NEXT_PUBLIC_APP_NAME`
 - **Campos obrigatórios do imóvel** (21/10/2026): só o piso do banco — título, tipo, finalidade, UF, cidade, bairro — mais o preço coerente com a finalidade. Área e dormitórios são opcionais, porque campo obrigatório que o corretor ainda não sabe produz número inventado. Consequência registrada para a Fase 3: filtro por área ou dormitório tem de **excluir** o imóvel sem o valor, nunca tratá-lo como zero
 - **Código do imóvel** (21/10/2026): gerado pelo servidor (`AP-001`, sequencial por organização, prefixo pelo tipo) e **editável** — a imobiliária que já numera imóveis usa essa referência no anúncio e no WhatsApp
+- **Hospedagem gerenciada, não VPS** (21/10/2026): o VPS daria Docker e root e cobraria a manutenção permanente do servidor. O produto é feito por uma pessoa só
+- **Sem workers persistentes, sem tarefas agendadas internas e sem WebSocket de entrada** — limites do plano. Consequência imediata: a correção documentada do A9 (enviar e-mail fora do caminho da requisição) **não é possível**; a saída entra junto com a escolha do provedor de e-mail
+- **A11 sobre o MySQL, não em memória** (21/10/2026): sem garantia de processo único, contador em memória daria um limite por processo
 - **Visibilidade do endereço é editável** (21/10/2026), ao contrário de `status` e `ownerMemberId`: é decisão de quem cadastra e precisa estar no formulário. O padrão restritivo continua no banco, então omitir o campo nunca abre o endereço — o esquecimento erra para o lado seguro
 - **O lead nasce atribuído a quem cadastrou** (21/10/2026), inclusive para `MANAGER` e acima. A matriz só exigia isso do `AGENT`; para os outros, deixá-lo sem responsável faria o contato que o gerente acabou de atender no telefone cair na fila como se ninguém o tivesse visto. Devolver à fila é um clique (`responsavel: null`)
 - **`origem` do lead não é editável** (21/10/2026): ela registra como o contato chegou, e editável transformaria o relatório de origem em opinião. `PUBLIC_CATALOG` é recusada no cadastro manual — só a vitrine a produz
@@ -78,7 +81,7 @@ Registradas com data em [docs/permissions.md](docs/permissions.md) §9, [docs/da
 - Git/GitHub para versionamento
 - Testes: unitários, integração e e2e para fluxos críticos
 - Ambiente local: MySQL local ou Docker *somente no desenvolvimento*, se for útil
-- Produção: hospedagem Node.js gerenciada, preferencialmente Hostinger, **dependente de validação dos limites do plano** para Next.js + API NestJS, variáveis, builds, processos e conexões de banco; não assumir acesso root, Docker em produção ou PostgreSQL interno.
+- Produção **decidida em 21/10/2026**: hospedagem **gerenciada** da Hostinger, plano **Unlimited**, com os limites confirmados pelo suporte — 2 aplicações Node simultâneas, 120 processos e 3 GB de RAM compartilhados, 75 conexões MySQL, processo contínuo sem hibernação. Mídia no **Cloudflare R2**. Continua valendo: não assumir acesso root, Docker em produção ou PostgreSQL interno. Detalhes e consequências em [docs/architecture.md](docs/architecture.md), seção Infraestrutura
 
 ## Identidade visual
 Nome provisoriamente aprovado pelo empreendedor: **Doverni**. Antes de uso público, verificar marca no INPI e domínio no Registro.br (a disponibilidade NÃO foi comprovada).
@@ -121,7 +124,7 @@ Nome provisoriamente aprovado pelo empreendedor: **Doverni**. Antes de uso públ
 - Senhas com hash forte, sessões protegidas, política para tokens/cookies, rate limiting e validação de entradas
 - Autorização robusta, logs de auditoria básicos, segredos fora do Git
 - Política de privacidade e requisitos LGPD desde o design, especialmente leads e fotos
-- Arquivos de mídia em armazenamento de objetos externo; não depender do disco efêmero da hospedagem
+- Arquivos de mídia em armazenamento de objetos externo (**Cloudflare R2**, decidido em 21/10/2026). A justificativa **mudou**: o disco da Hostinger não é efêmero — isso vale para plataformas em contêiner, não para hospedagem tradicional. O motivo real é não gastar a CPU e a banda do plano compartilhado servindo foto de catálogo público, trabalho que o R2 faz de graça e perto do visitante
 - Migrações versionadas e backups testados
 - Tratamento de erros seguro e observabilidade mínima
 - Paginação em listagens; índices apropriados; evitar N+1
