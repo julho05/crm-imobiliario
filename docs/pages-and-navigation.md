@@ -177,7 +177,13 @@ O seletor de organização ativa aparece **somente** para quem tem mais de um `M
 
 ### `/painel` — dashboard
 
-**[PROPOSTA]** O conteúdo muda com o papel, porque o que é urgente muda com o papel.
+**Construído em 22/10/2026** (item B9), sobre `GET /painel/resumo`. O conteúdo muda com o papel, porque o que é urgente muda com o papel — e quem decide o recorte de cada número é o **servidor**, pela matriz, não a tela pelo papel.
+
+Três coisas que a construção acrescentou à proposta abaixo:
+
+1. **A resposta diz o escopo de cada número** (`escopos`), para a tela escrever "seus clientes" ou "da equipe". Sem isso, uma legenda única mentiria para metade dos papéis.
+2. **Cartão de número só aparece quando há número.** Painel de quatro zeros ocupa a tela para dizer "nada a fazer". Sem pendência, a tela diz isso em uma linha e dá o espaço à agenda do dia.
+3. **O guia de primeiros passos substitui o painel apenas quando a organização não tem imóvel *nem* cliente**, e o critério é da **organização**, não da pessoa: o corretor recém-contratado numa imobiliária povoada vê o painel, não um tutorial. O guia também **não** menciona a vitrine, que é a Fase 3 e não existe.
 
 Para `AGENT`: meus leads novos, minhas visitas de hoje e amanhã, minhas tarefas vencidas, meus imóveis em rascunho.
 

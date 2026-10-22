@@ -15,5 +15,7 @@ import { ImoveisService } from './imoveis.service';
   imports: [AutorizacaoModule],
   controllers: [ImoveisController],
   providers: [ImoveisService],
+  // Exportado para o PainelModule, pelo mesmo motivo do LeadsModule.
+  exports: [ImoveisService],
 })
 export class ImoveisModule {}

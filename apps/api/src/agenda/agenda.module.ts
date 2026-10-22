@@ -17,5 +17,8 @@ import { VisitasService } from './visitas.service';
   imports: [AutorizacaoModule],
   controllers: [VisitasController, TarefasController],
   providers: [VisitasService, TarefasService],
+  // Exportados para o PainelModule: as visitas de hoje e as tarefas vencidas
+  // do resumo saem daqui, com a visibilidade de duas portas ja aplicada.
+  exports: [VisitasService, TarefasService],
 })
 export class AgendaModule {}

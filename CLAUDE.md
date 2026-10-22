@@ -60,7 +60,19 @@ Na tela, essa decisão aparece em **um** lugar concreto: o link para a ficha do 
 
 O seed cria **15 visitas e 18 tarefas**, com datas **relativas a hoje** — data fixa envelheceria e em um mês a agenda do seed estaria toda no passado. Uma linha existe só para provar a segunda porta: a visita do cliente da Bianca conduzida pelo Tiago, e o seed imprime como chegar nela.
 
-Ainda não existem dashboard nem catálogo público.
+Em 22/10/2026 entrou o **B9** — o dashboard —, com `GET /painel/resumo` e a reescrita do `/painel`, que até então era provisório. São **722 testes**.
+
+**Uma rota com quatro escopos é o que define o item.** O resumo responde a mais de uma pergunta na mesma requisição, e os escopos divergem: `lead:ver` é `OWN` para o corretor, `imovel:ver` é `ORG` para todos, `lead:verNaoAtribuidos` é `false` para ele. `@Exige` é estático por rota, então a guarda confere o piso e cada número é calculado num contexto derivado (`paraAcao()`), com o escopo que a **matriz** dá à ação daquele número. O resumo reaproveita os serviços de imóveis, leads e agenda em vez de consultar as tabelas — consulta própria seria cópia de recorte, e foi cópia de recorte que vazou nome de cliente excluído no B7.
+
+Três decisões de produto que vale não reabrir:
+
+- **O escopo dos rascunhos vem de `imovel:editar`**, não de `imovel:ver`. O número responde "o que falta eu terminar", e `imovel:ver` daria ao corretor o total da casa — trabalho que ele não pode fazer
+- **A fila a distribuir é `null`, nunca `0`, para quem não a alcança.** `0` afirmaria que ela está vazia
+- **O guia de primeiros passos substitui o painel só quando a organização não tem imóvel nem cliente**, pelo que existe na **organização** e não no que é da pessoa. O guia não menciona a vitrine, que é a Fase 3
+
+**Um defeito do B8 apareceu ao montar o painel e foi corrigido:** `acessivel`, no recorte do cliente da agenda, comparava só a atribuição. Para `MANAGER` e acima — escopo `ORG` — a resposta dizia `false` em toda visita de cliente de outra pessoa, e a tela escondia um link que funcionaria. Errava para o lado seguro, e por isso nenhum teste de isolamento o pegou: isolamento prova o que **não** deve aparecer, e este era algo permitido que não aparecia. Agora o cálculo considera o escopo, com teste para os quatro papéis.
+
+Ainda não existe catálogo público.
 
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 

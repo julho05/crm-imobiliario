@@ -12,7 +12,11 @@ import type { Prisma } from '../generated/prisma/client';
 import { NaoEncontrado } from '../comum/nao-encontrado';
 import { AutorizacaoService } from '../autorizacao/autorizacao.service';
 import type { ContextoAutorizado } from '../autorizacao/autorizacao.guard';
-import { paraRespostaDeVisita, type RespostaDeVisita } from './resposta';
+import {
+  paraRespostaDeVisita,
+  type QuemPergunta,
+  type RespostaDeVisita,
+} from './resposta';
 
 /**
  * Visitas — item **B8**.
@@ -147,7 +151,7 @@ export class VisitasService {
         tx,
       );
 
-      return paraRespostaDeVisita(criada, contexto.membershipId);
+      return paraRespostaDeVisita(criada, this.quemPergunta(contexto));
     });
   }
 
@@ -178,7 +182,7 @@ export class VisitasService {
     });
 
     return visitas.map((visita) =>
-      paraRespostaDeVisita(visita, contexto.membershipId),
+      paraRespostaDeVisita(visita, this.quemPergunta(contexto)),
     );
   }
 
@@ -190,7 +194,7 @@ export class VisitasService {
 
     return paraRespostaDeVisita(
       this.conferir(contexto, carregada),
-      contexto.membershipId,
+      this.quemPergunta(contexto),
     );
   }
 
@@ -242,7 +246,7 @@ export class VisitasService {
         tx,
       );
 
-      return paraRespostaDeVisita(atualizada, contexto.membershipId);
+      return paraRespostaDeVisita(atualizada, this.quemPergunta(contexto));
     });
   }
 
@@ -279,7 +283,7 @@ export class VisitasService {
         tx,
       );
 
-      return paraRespostaDeVisita(atualizada, contexto.membershipId);
+      return paraRespostaDeVisita(atualizada, this.quemPergunta(contexto));
     });
   }
 
@@ -333,7 +337,7 @@ export class VisitasService {
         tx,
       );
 
-      return paraRespostaDeVisita(atualizada, contexto.membershipId);
+      return paraRespostaDeVisita(atualizada, this.quemPergunta(contexto));
     });
   }
 
@@ -385,6 +389,22 @@ export class VisitasService {
         ? contexto.membershipId
         : (carregada?.lead?.assignedMemberId ?? null),
     });
+  }
+
+  /**
+   * Quem está perguntando, para o recorte do cliente em `resposta.ts`.
+   *
+   * O escopo sai de **`lead:ver`**, e não da ação desta rota: a pergunta que
+   * ele responde é "esta pessoa alcança a ficha deste cliente?", e quem decide
+   * isso é a permissão de ver cliente. Usar o escopo de `negociacao:ver`
+   * acertaria por coincidência hoje — as duas linhas da matriz são iguais — e
+   * erraria calado no dia em que uma delas mudasse.
+   */
+  private quemPergunta(contexto: ContextoAutorizado): QuemPergunta {
+    return {
+      membershipId: contexto.membershipId,
+      alcancaTodosOsClientes: podeFazer(contexto.papel, 'lead:ver') === 'ORG',
+    };
   }
 
   private carregar(contexto: ContextoAutorizado, id: string) {

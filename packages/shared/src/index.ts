@@ -29,3 +29,4 @@ export * from './schemas/imovel';
 export * from './schemas/lead';
 export * from './schemas/negociacao';
 export * from './schemas/agenda';
+export * from './schemas/painel';

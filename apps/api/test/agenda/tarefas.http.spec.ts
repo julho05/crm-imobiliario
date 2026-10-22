@@ -253,6 +253,23 @@ describe('as duas portas', () => {
     expect(((await resposta.json()) as Tarefa).cliente?.acessivel).toBe(false);
   });
 
+  it('marca o cliente como acessivel para quem tem escopo ORG', async () => {
+    // O outro lado do teste acima, e o defeito corrigido em 22/10/2026: para o
+    // gerente, `lead:ver` e `ORG` e a ficha do cliente abre — entao a resposta
+    // precisa dizer `true`, ou a tela esconde um link que funcionaria.
+    const tarefa = await criarEObter(cenario.managerA.cookie, {
+      clienteId: cenario.leadDeA1,
+      responsavelId: cenario.agenteA2.membershipId,
+    });
+
+    const resposta = await obter(
+      `/tarefas/${tarefa.id}`,
+      cenario.managerA.cookie,
+    );
+
+    expect(((await resposta.json()) as Tarefa).cliente?.acessivel).toBe(true);
+  });
+
   it('a tarefa solta aparece na lista de quem responde por ela', async () => {
     await criarEObter(cenario.agenteA1.cookie, {
       titulo: 'Preparar material da feira',

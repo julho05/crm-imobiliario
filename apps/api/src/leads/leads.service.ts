@@ -225,6 +225,30 @@ export class LeadsService {
     });
   }
 
+  /**
+   * Quantos leads novos esperam primeiro contato, **no alcance de quem
+   * pergunta**.
+   *
+   * Reaproveita o `recorteDeVisibilidade` da listagem de propósito: é o mesmo
+   * recorte, e escrever a condição de novo aqui criaria duas versões da mesma
+   * regra. Foi assim que, no item B7, um filtro escrito duas vezes deixou
+   * passar o nome de um cliente excluído por um dos dois caminhos.
+   *
+   * Para o `AGENT` o número é o dele, porque `lead:ver` é `OWN`. Para
+   * `MANAGER` e acima é o da organização — o que o §5 do mapa de telas pede.
+   */
+  async contarNovos(contexto: ContextoAutorizado): Promise<number> {
+    return this.prisma.lead.count({
+      where: {
+        organizationId: contexto.organizationId,
+        deletedAt: null,
+        anonymizedAt: null,
+        status: 'NEW',
+        ...this.recorteDeVisibilidade(contexto, {}),
+      },
+    });
+  }
+
   /** Um lead. Fora do alcance de quem pede, 404 — nunca 403. */
   async ver(contexto: ContextoAutorizado, id: string): Promise<RespostaDeLead> {
     const carregado = await this.carregar(contexto, id);

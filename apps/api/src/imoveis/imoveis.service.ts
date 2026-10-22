@@ -307,6 +307,37 @@ export class ImoveisService {
     };
   }
 
+  /**
+   * Quantos imoveis estao em rascunho — cadastro comecado e nao terminado.
+   *
+   * ## Por que o recorte sai de `imovel:editar`, e nao de `imovel:ver`
+   *
+   * Porque a pergunta que este numero responde e **"o que falta eu
+   * terminar?"**, e terminar um cadastro e edita-lo. Como `imovel:ver` e `ORG`
+   * para todos os papeis, usa-la aqui daria ao corretor o total de rascunhos da
+   * casa inteira — numero que ele nao pode resolver, porque nao edita o imovel
+   * do colega. Um contador que aponta trabalho que a pessoa nao pode fazer e
+   * pior do que nenhum: ela aprende a ignora-lo.
+   *
+   * Entao o escopo vem da acao de editar: `OWN` para o `AGENT`, `ORG` para
+   * `MANAGER` e acima — exatamente o que o §5 do mapa de telas descreve como
+   * "meus imoveis em rascunho".
+   *
+   * Quem chama e responsavel por entregar o contexto com a acao certa.
+   */
+  async contarRascunhos(contexto: ContextoAutorizado): Promise<number> {
+    return this.prisma.property.count({
+      where: {
+        organizationId: contexto.organizationId,
+        deletedAt: null,
+        status: 'DRAFT',
+        ...(contexto.escopo === 'OWN'
+          ? { ownerMemberId: contexto.membershipId }
+          : {}),
+      },
+    });
+  }
+
   /** Um imovel da organizacao ativa. Fora dela, 404 — nunca 403. */
   async ver(
     contexto: ContextoAutorizado,

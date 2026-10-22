@@ -112,7 +112,7 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B6 | Fila de não atribuídos — *concluído em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
 | B7 | Funil — *concluído em 21/10/2026* | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
 | B8 | Agenda e tarefas — *concluído em 22/10/2026* | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
-| B9 | Dashboard | Conteúdo muda por papel; organização nova mostra primeiros passos, não zeros | B1, B5 |
+| B9 | Dashboard — *concluído em 22/10/2026* | Conteúdo muda por papel; organização nova mostra primeiros passos, não zeros | B1, B5 |
 | B10 | Desempenho de listagem | Paginação em todas as listas; **teste que conta consultas** e falha se a listagem fizer uma por item | B1, B5 |
 
 ### Telas de imóveis — **concluído em 21/10/2026**
@@ -236,6 +236,33 @@ Quinze visitas e dezoito tarefas nas três organizações. Dois pontos de métod
 - **Uma linha existe só para provar a segunda porta**: a visita do cliente da Bianca conduzida pelo Tiago. Entrando como Tiago, ela aparece com o nome e o telefone da cliente e **sem** link para a ficha, que responde 404 para ele. Sem esse registro no banco, a decisão de 21/10/2026 não teria como ser vista funcionando, e o seed imprime a instrução de como chegar nela
 
 **Verificação.** 697 testes na API, `npm run build` passando nos dois apps. O percurso foi exercitado contra o servidor em execução: agendar atribuindo a outra pessoa, editar horário, mudar situação, criar tarefa, o erro por campo do fim antes do início, e os três códigos que a matriz decide — o corretor atribuindo recebe **403**, o gerente **200**, e o corretor que perdeu a condução da visita passa a receber **404** nela. As telas continuam **sem teste de componente**, pela decisão de 21/10/2026.
+
+---
+
+### Dashboard — **concluído em 22/10/2026**
+
+`GET /painel/resumo` e a reescrita do `/painel`, que até aqui era provisório. 23 testes novos.
+
+**Uma rota, quatro escopos — e é isso que define o item.** O resumo é a primeira rota do projeto que responde a mais de uma pergunta na mesma requisição, e os escopos divergem de verdade: `lead:ver` é `OWN` para o corretor, `imovel:ver` é `ORG` para todos, `lead:verNaoAtribuidos` é `false` para ele. Um `@Exige` não expressa isso — ele é estático por rota.
+
+A saída foi `paraAcao()`: a guarda confere o piso (sessão, organização ativa, vínculo), e cada número é calculado num contexto derivado, com a ação que ele representa e o escopo que a **matriz** dá àquela ação para aquele papel. Nenhum serviço sabe que está sendo chamado pelo resumo; cada um continua lendo `contexto.escopo` como sempre.
+
+Decisões tomadas durante a implementação:
+
+- **O resumo reaproveita os serviços, não consulta as tabelas.** Seria menos acoplado consultar direto, e mais perigoso: cada consulta própria seria uma cópia de um recorte de visibilidade. O item B7 já pagou essa conta — um filtro escrito duas vezes deixou o nome de um cliente excluído sair por um dos dois caminhos. Em um resumo o erro é ainda mais discreto, porque contador inflado não parece defeito, parece número grande
+- **O escopo dos rascunhos vem de `imovel:editar`, não de `imovel:ver`.** A pergunta que o número responde é "o que falta eu terminar?", e terminar é editar. Como `imovel:ver` é `ORG` para todos, usá-la daria ao corretor o total da casa inteira — trabalho que ele não pode fazer, porque não edita o imóvel do colega. Contador que aponta trabalho impossível ensina a pessoa a ignorá-lo
+- **A fila a distribuir é `null`, nunca `0`, para quem não a alcança.** `0` afirmaria que a fila está vazia, e a tela mostraria um número tranquilizador que ninguém mediu. `null` diz "esta pergunta não é sua", e o cartão não existe
+- **A resposta carrega `escopos`**, e não é informação de depuração: é o que permite à tela escrever "seus clientes" ou "da equipe". "3 clientes novos" significa coisas diferentes por papel, e uma legenda única mentiria para metade deles
+- **A janela de "hoje e amanhã" vem do navegador**, como na agenda, com teto de três dias no contrato. O servidor não sabe o fuso de quem olha; calculada em UTC, a janela mostraria a agenda de amanhã às 22h de Brasília. O teto existe para este endpoint não virar um segundo caminho para listar a agenda inteira
+- **Cartão de número só aparece quando há número.** Painel com quatro zeros ocupa a tela para dizer "nada a fazer" e ensina a não olhar. Sem pendência, a tela diz isso em uma linha e dá o espaço à agenda do dia
+- **Primeiros passos substituem o painel só quando a organização não tem imóvel *nem* cliente.** Quem já cadastrou imóvel está operando e merece ver a pendência apontada, não um tutorial. A decisão vem de contagens da **organização**, não do que é da pessoa: para o corretor recém-contratado numa imobiliária povoada, a casa já opera, e ele vê o painel
+- **O guia não menciona a vitrine**, por mais natural que fosse ("cadastre → publique → compartilhe"). Ela é a Fase 3 e não existe. Guia que promete tela inexistente gasta a confiança que deveria construir
+
+**Um defeito do B8 apareceu aqui, e foi corrigido.** `acessivel`, no recorte do cliente da agenda, comparava apenas `lead.assignedMemberId === membershipId`. Para o `AGENT` está certo — `lead:ver` é `OWN` para ele. Para `MANAGER` e acima estava **errado para o lado seguro**: o escopo deles é `ORG`, a ficha do cliente abre, e a tela escondia o link em toda visita ou tarefa de cliente de outra pessoa. Ninguém perdeu dado; o gerente apenas não conseguia chegar ao cliente a partir da agenda, e nada explicava por quê.
+
+Ficou invisível por um dia porque **teste de isolamento testa o que não deve aparecer**, e este era o contrário: algo permitido que não aparecia. Apareceu quando o painel do gerente ficou sem um único link para cliente. O cálculo agora considera o escopo, há teste para os quatro papéis, e o campo ganhou a nota do porquê.
+
+**Verificação.** 722 testes na API, `npm run build` nos dois apps. Exercitado contra o servidor com as contas do seed: o corretor vê 1 cliente novo, 1 rascunho, `naFila: null` e só a visita dele; o gerente vê 9, 3, `naFila: 3` e as três visitas da casa. Uma conta criada pelo `POST /autenticacao/cadastro` devolveu os três primeiros passos pendentes e todos os contadores em zero — o caso do guia.
 
 ---
 

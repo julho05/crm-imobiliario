@@ -15,5 +15,8 @@ import { LeadsService } from './leads.service';
   imports: [AutorizacaoModule],
   controllers: [LeadsController],
   providers: [LeadsService],
+  // Exportado para o PainelModule: o resumo do item B9 reaproveita os
+  // contadores daqui, que ja carregam o recorte de visibilidade do lead.
+  exports: [LeadsService],
 })
 export class LeadsModule {}

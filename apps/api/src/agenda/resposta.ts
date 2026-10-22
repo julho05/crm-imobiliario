@@ -17,7 +17,34 @@ import type { TaskStatus, VisitStatus } from '@app/shared';
  * `clienteAcessivel` diz à interface se vale oferecer o link para a ficha do
  * cliente. Sem ele, a tela ofereceria um link que responde 404 — e a pessoa
  * concluiria que o sistema está quebrado, quando ele está funcionando.
+ *
+ * ## `acessivel` depende do **escopo**, e não só da atribuição
+ *
+ * Corrigido em 22/10/2026, e o erro valeu a lição: a primeira versão comparava
+ * apenas `lead.assignedMemberId === membershipId`. Para o `AGENT` isso está
+ * certo — `lead:ver` é `OWN` para ele. Para `MANAGER` e acima estava **errado
+ * para o lado seguro**: o escopo deles é `ORG`, a ficha do cliente abre, e a
+ * tela escondia o link em toda visita de cliente de outra pessoa. Ninguém
+ * perdeu dado; o gerente apenas não conseguia chegar ao cliente a partir da
+ * agenda, e nada na tela explicava por quê.
+ *
+ * Apareceu ao montar o dashboard (item B9), onde o painel do gerente ficava sem
+ * um único link para cliente. É o tipo de defeito que nenhum teste de
+ * isolamento pega, porque isolamento testa o que **não** deve aparecer.
  */
+
+/**
+ * Quem está perguntando, para o recorte do cliente.
+ *
+ * Dois campos, e os dois vêm do servidor: o vínculo de quem pede e se o papel
+ * dele alcança **todos** os clientes da organização. O segundo sai da matriz,
+ * pela mesma `podeFazer()` da guarda.
+ */
+export type QuemPergunta = {
+  membershipId: string;
+  /** `lead:ver` com escopo `ORG` para este papel. */
+  alcancaTodosOsClientes: boolean;
+};
 
 export type ClienteDaAgenda = {
   id: string;
@@ -64,7 +91,7 @@ type VisitaCarregada = {
 
 export function paraRespostaDeVisita(
   visita: VisitaCarregada,
-  membershipId: string,
+  quem: QuemPergunta,
 ): RespostaDeVisita {
   return {
     id: visita.id,
@@ -80,7 +107,9 @@ export function paraRespostaDeVisita(
           // O telefone entra porque a visita acontece no mundo fisico: quem
           // conduz precisa poder avisar que esta atrasado.
           telefone: visita.lead.phone,
-          acessivel: visita.lead.assignedMemberId === membershipId,
+          acessivel:
+            quem.alcancaTodosOsClientes ||
+            visita.lead.assignedMemberId === quem.membershipId,
         }
       : null,
     responsavel: {
@@ -91,7 +120,7 @@ export function paraRespostaDeVisita(
     fimEm: visita.endsAt.toISOString(),
     situacao: visita.status,
     observacoes: visita.notes,
-    minha: visita.assignedMemberId === membershipId,
+    minha: visita.assignedMemberId === quem.membershipId,
     criadaEm: visita.createdAt.toISOString(),
     atualizadaEm: visita.updatedAt.toISOString(),
   };
@@ -136,7 +165,7 @@ type TarefaCarregada = {
 
 export function paraRespostaDeTarefa(
   tarefa: TarefaCarregada,
-  membershipId: string,
+  quem: QuemPergunta,
 ): RespostaDeTarefa {
   return {
     id: tarefa.id,
@@ -149,7 +178,9 @@ export function paraRespostaDeTarefa(
           id: tarefa.lead.id,
           nomeCompleto: tarefa.lead.fullName,
           telefone: tarefa.lead.phone,
-          acessivel: tarefa.lead.assignedMemberId === membershipId,
+          acessivel:
+            quem.alcancaTodosOsClientes ||
+            tarefa.lead.assignedMemberId === quem.membershipId,
         }
       : null,
     negociacao: tarefa.deal
@@ -166,7 +197,7 @@ export function paraRespostaDeTarefa(
       membershipId: tarefa.assignedMember.id,
       nome: tarefa.assignedMember.user.name,
     },
-    minha: tarefa.assignedMemberId === membershipId,
+    minha: tarefa.assignedMemberId === quem.membershipId,
     // Calculado no servidor, e nao na interface: "vencida" depende do relogio,
     // e o relogio do navegador pode estar errado ou em outro fuso. O servidor
     // tem um so.

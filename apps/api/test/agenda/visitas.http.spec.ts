@@ -369,6 +369,22 @@ describe('recorte do cliente — o que a segunda porta NÃO abre', () => {
     expect(((await doDono.json()) as Visita).cliente?.acessivel).toBe(true);
   });
 
+  it('o cliente **e** acessivel para quem tem escopo ORG, mesmo sem responder por ele', async () => {
+    // Corrige um defeito de 21/10/2026, achado em 22/10 ao montar o dashboard:
+    // `acessivel` comparava so a atribuicao, entao para o gerente — cujo
+    // `lead:ver` e `ORG` — a resposta dizia `false` em toda visita de cliente
+    // de outra pessoa. A ficha abre; a tela e que escondia o link, e nada
+    // explicava por que. Errava para o lado seguro, e por isso ficou invisivel
+    // ate uma tela depender dele.
+    const visita = await visitaCruzada();
+
+    for (const quem of [cenario.managerA, cenario.adminA, cenario.ownerA]) {
+      const resposta = await obter(`/visitas/${visita.id}`, quem.cookie);
+
+      expect(((await resposta.json()) as Visita).cliente?.acessivel).toBe(true);
+    }
+  });
+
   it('não entrega anotações, origem nem situação do cliente', async () => {
     await prisma.lead.update({
       where: { id: cenario.leadDeA2 },
