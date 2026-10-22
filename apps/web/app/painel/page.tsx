@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Building2, Users } from 'lucide-react';
+import {
+  ArrowRight,
+  Building2,
+  CalendarDays,
+  ListChecks,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
 import { podeFazer, ROTULOS_DE_PAPEL } from '@app/shared';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,37 +31,54 @@ import { useSessao } from '@/lib/sessao-do-painel';
  * pessoa o que fazer**.
  *
  * O que esta tela faz e o que ja da para fazer com honestidade: aponta para as
- * duas secoes que existem e mostra **um** numero — o de clientes esperando
- * distribuicao. Esse numero nao e enfeite:
- * [permissions.md](../../../../docs/permissions.md) §5 registra que, sem ele
- * visivel, a fila de nao atribuidos cresce sem ninguem perceber, e lead parado
- * e venda perdida. E o unico contador que se justifica antes do B9.
+ * secoes que existem e mostra **dois** numeros, cada um porque a ausencia dele
+ * custa dinheiro:
+ *
+ * - **clientes esperando distribuicao**:
+ *   [permissions.md](../../../../docs/permissions.md) §5 registra que, sem ele
+ *   visivel, a fila de nao atribuidos cresce sem ninguem perceber, e lead
+ *   parado e venda perdida
+ * - **tarefas vencidas**: o §5 do mapa de telas as poe no resumo do dia de
+ *   todos os papeis. Tarefa anotada e esquecida e pior do que tarefa nao
+ *   anotada, porque cria a impressao de que o compromisso esta sob controle
+ *
+ * Os dois sao contadores de coisa **parada**, e e so isso que se justifica
+ * antes do B9. Grafico de desempenho e resumo por periodo sao o dashboard, e o
+ * dashboard precisa mudar de conteudo por papel.
  */
 export default function Painel() {
   const { organizacaoAtiva, papel } = useSessao();
 
   const alcancaAFila = podeFazer(papel, 'lead:verNaoAtribuidos') !== false;
   const [naFila, setNaFila] = useState<number | null>(null);
+  const [vencidas, setVencidas] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!alcancaAFila) {
-      return;
-    }
-
     let ativo = true;
 
     void (async () => {
-      try {
-        const { total } = await chamarApi<{ total: number }>(
-          '/leads/nao-atribuidos/contagem',
-        );
+      // Cada contador por conta propria, e nao um `Promise.all`: se a fila
+      // falhar, as tarefas vencidas continuam aparecendo. Com `all`, uma falha
+      // apagaria os dois numeros.
+      const [fila, atrasadas] = await Promise.allSettled([
+        alcancaAFila
+          ? chamarApi<{ total: number }>('/leads/nao-atribuidos/contagem')
+          : Promise.resolve(null),
+        chamarApi<{ total: number }>('/tarefas/vencidas/contagem'),
+      ]);
 
-        if (ativo) {
-          setNaFila(total);
-        }
-      } catch {
-        // Contador e informacao auxiliar: falhar nele nao deve estragar a
-        // tela. Fica sem numero, e os atalhos continuam funcionando.
+      if (!ativo) {
+        return;
+      }
+
+      // Contador e informacao auxiliar: falhar nele nao deve estragar a tela.
+      // Fica sem numero, e os atalhos continuam funcionando.
+      if (fila.status === 'fulfilled' && fila.value !== null) {
+        setNaFila(fila.value.total);
+      }
+
+      if (atrasadas.status === 'fulfilled') {
+        setVencidas(atrasadas.value.total);
       }
     })();
 
@@ -90,6 +114,29 @@ export default function Painel() {
               <Button asChild size="sm">
                 <Link href="/painel/leads">
                   Distribuir agora
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {vencidas !== null && vencidas > 0 ? (
+          <Card className="border-destructive/40">
+            <CardHeader>
+              <CardTitle className="text-base">
+                {vencidas === 1
+                  ? '1 tarefa vencida'
+                  : `${vencidas} tarefas vencidas`}
+              </CardTitle>
+              <CardDescription>
+                O prazo passou e elas continuam abertas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/painel/tarefas">
+                  Ver o que esta atrasado
                   <ArrowRight aria-hidden="true" className="size-4" />
                 </Link>
               </Button>
@@ -140,11 +187,72 @@ export default function Painel() {
 
         <Card>
           <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TrendingUp aria-hidden="true" className="size-4" />
+              Funil
+            </CardTitle>
+            <CardDescription>
+              Acompanhe em que etapa esta cada negocio e o que foi ganho ou
+              perdido.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/painel/funil">
+                Ver o funil
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarDays aria-hidden="true" className="size-4" />
+              Agenda
+            </CardTitle>
+            <CardDescription>
+              As visitas marcadas, por dia, semana ou mes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/painel/agenda">
+                Ver a agenda
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ListChecks aria-hidden="true" className="size-4" />
+              Tarefas
+            </CardTitle>
+            <CardDescription>
+              O que precisa ser feito, com prazo e responsavel.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/painel/tarefas">
+                Ver tarefas
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle className="text-base">O que ainda nao existe</CardTitle>
             <CardDescription>
-              Funil de negociacao, agenda de visitas, tarefas e o catalogo
-              publico estao nas proximas etapas. O resumo do dia, com visitas e
-              tarefas, aparece aqui quando houver dado para resumir.
+              O dashboard por papel e o catalogo publico estao nas proximas
+              etapas. O resumo do dia, com as visitas de hoje e o desempenho do
+              periodo, aparece aqui quando houver o que resumir.
             </CardDescription>
           </CardHeader>
         </Card>

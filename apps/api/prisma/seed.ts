@@ -12,6 +12,8 @@ import {
   type PropertyStatus,
   type PropertyType,
   type Role,
+  type TaskStatus,
+  type VisitStatus,
 } from '@app/shared';
 import { PrismaClient } from '../src/generated/prisma/client';
 
@@ -141,6 +143,45 @@ type NegociacaoDoSeed = {
   imovel: number | null;
   valorEsperado?: number;
   motivoDaPerda?: string;
+};
+
+/**
+ * Visita do seed.
+ *
+ * `dias` e `hora` sao **relativos a hoje**, e nao datas fixas. Data fixa
+ * envelhece: num mes, toda a agenda do seed estaria no passado, e a tela que
+ * mais importa conferir — "o que tenho esta semana" — nasceria vazia.
+ */
+type VisitaDoSeed = {
+  /** Indice em `imoveis`. Obrigatorio: visita e a alguma coisa. */
+  imovel: number;
+  /** Indice em `leads`, ou `null` para o interessado que apareceu na porta. */
+  cliente: number | null;
+  /** Indice em `pessoas`: quem conduz. Obrigatorio no banco. */
+  responsavel: number;
+  /** Dias a partir de hoje. Negativo e passado. */
+  dias: number;
+  hora: number;
+  duracaoEmHoras?: number;
+  situacao: VisitStatus;
+  observacoes?: string;
+};
+
+/** Tarefa do seed. Os tres vinculos sao opcionais e independentes. */
+type TarefaDoSeed = {
+  titulo: string;
+  /** Indice em `pessoas`. */
+  responsavel: number;
+  /** Dias a partir de hoje, ou `null` para tarefa sem prazo. */
+  dias: number | null;
+  hora?: number;
+  situacao: TaskStatus;
+  /** Indice em `leads`. */
+  cliente?: number;
+  /** Indice em `negociacoes`. */
+  negociacao?: number;
+  /** Indice em `imoveis`. */
+  imovel?: number;
 };
 
 type LeadDoSeed = {
@@ -478,6 +519,302 @@ function negociacoesDaAurora(): NegociacaoDoSeed[] {
   ];
 }
 
+/**
+ * Quinze visitas na organizacao grande.
+ *
+ * Os pontos de variacao, cada um para que uma tela possa ser conferida:
+ *
+ * - **visitas em cinco periodos** — semana passada, ontem, hoje, esta semana e
+ *   mes que vem —, porque a agenda abre na semana e as setas precisam ter para
+ *   onde levar
+ * - **duas hoje**, que e o unico jeito de ver o agrupamento por dia com mais de
+ *   uma linha
+ * - **as cinco situacoes**, incluindo a cancelada e a "nao compareceu", que sao
+ *   as que a lista mostra esmaecidas
+ * - **uma sem cliente**, o interessado que apareceu no imovel sem cadastro
+ * - **o caso que forcou a decisao de 21/10/2026**: a visita do cliente da
+ *   Bianca conduzida pelo Tiago. E o unico registro do seed que prova a
+ *   segunda porta de visibilidade — entrando como Tiago, a visita aparece com
+ *   o nome e o telefone da cliente, e **sem** link para a ficha dela, porque
+ *   `/painel/leads/<id>` responde 404 para ele. Sem esta linha no banco, a
+ *   decisao inteira nao teria como ser vista funcionando
+ */
+function visitasDaAurora(): VisitaDoSeed[] {
+  return [
+    // Semana passada e ontem: historico, para a seta de "periodo anterior".
+    {
+      imovel: 4,
+      cliente: 3,
+      responsavel: 3,
+      dias: -8,
+      hora: 10,
+      situacao: 'DONE',
+      observacoes: 'Cliente gostou. Vai conversar com a esposa.',
+    },
+    {
+      imovel: 0,
+      cliente: 0,
+      responsavel: 3,
+      dias: -1,
+      hora: 14,
+      situacao: 'DONE',
+    },
+    {
+      imovel: 1,
+      cliente: 1,
+      responsavel: 3,
+      dias: -1,
+      hora: 17,
+      situacao: 'NO_SHOW',
+      observacoes: 'Nao apareceu e nao avisou.',
+    },
+    // Hoje, duas: uma confirmada de manha e uma a tarde sem cliente.
+    {
+      imovel: 2,
+      cliente: 2,
+      responsavel: 3,
+      dias: 0,
+      hora: 9,
+      situacao: 'CONFIRMED',
+      observacoes: 'Confirmou por telefone. Chave na portaria.',
+    },
+    {
+      imovel: 3,
+      cliente: null,
+      responsavel: 4,
+      dias: 0,
+      hora: 16,
+      situacao: 'SCHEDULED',
+      observacoes: 'Interessado que passou em frente ao imovel. Sem cadastro.',
+    },
+    {
+      imovel: 6,
+      cliente: 5,
+      responsavel: 4,
+      dias: 1,
+      hora: 11,
+      situacao: 'SCHEDULED',
+    },
+    // A visita que prova a segunda porta: cliente da Bianca (lead 6),
+    // conduzida pelo Tiago (pessoa 3) porque ela nao pode no dia.
+    {
+      imovel: 7,
+      cliente: 6,
+      responsavel: 3,
+      dias: 2,
+      hora: 10,
+      duracaoEmHoras: 2,
+      situacao: 'CONFIRMED',
+      observacoes:
+        'Cliente da Bianca. Ela nao pode neste dia e pediu ao Tiago para conduzir.',
+    },
+    {
+      imovel: 8,
+      cliente: 10,
+      responsavel: 2,
+      dias: 3,
+      hora: 15,
+      situacao: 'CONFIRMED',
+    },
+    {
+      imovel: 9,
+      cliente: 12,
+      responsavel: 1,
+      dias: 4,
+      hora: 9,
+      situacao: 'CANCELED',
+      observacoes: 'Cliente desmarcou: viagem de trabalho.',
+    },
+    {
+      imovel: 10,
+      cliente: 13,
+      responsavel: 0,
+      dias: 5,
+      hora: 18,
+      situacao: 'SCHEDULED',
+    },
+    {
+      imovel: 11,
+      cliente: 7,
+      responsavel: 4,
+      dias: 6,
+      hora: 10,
+      situacao: 'SCHEDULED',
+    },
+    {
+      imovel: 12,
+      cliente: 8,
+      responsavel: 4,
+      dias: 9,
+      hora: 14,
+      situacao: 'SCHEDULED',
+    },
+    {
+      imovel: 13,
+      cliente: 2,
+      responsavel: 3,
+      dias: 12,
+      hora: 11,
+      situacao: 'SCHEDULED',
+    },
+    // Mes que vem: so aparece no periodo "mes", e so depois de avancar uma vez.
+    {
+      imovel: 14,
+      cliente: 9,
+      responsavel: 4,
+      dias: 34,
+      hora: 10,
+      situacao: 'SCHEDULED',
+    },
+    {
+      imovel: 15,
+      cliente: 11,
+      responsavel: 2,
+      dias: 38,
+      hora: 16,
+      situacao: 'SCHEDULED',
+    },
+  ];
+}
+
+/**
+ * Catorze tarefas na organizacao grande.
+ *
+ * - **quatro vencidas**, para o contador do painel e a aba "Vencidas". Vencida
+ *   e **aberta com prazo no passado**: a concluida com atraso nao conta, e
+ *   existe aqui uma dessas para provar a diferenca
+ * - **duas sem prazo**, que vao para o fim da lista e nunca vencem
+ * - **uma concluida e uma cancelada**, para a aba de concluidas e para a linha
+ *   esmaecida
+ * - **os tres vinculos** — cliente, negociacao e imovel —, mais tarefas soltas
+ */
+function tarefasDaAurora(): TarefaDoSeed[] {
+  return [
+    {
+      titulo: 'Levar a contraproposta assinada',
+      responsavel: 3,
+      dias: -4,
+      hora: 17,
+      situacao: 'OPEN',
+      cliente: 0,
+      negociacao: 0,
+    },
+    {
+      titulo: 'Pedir a matricula atualizada no cartorio',
+      responsavel: 3,
+      dias: -2,
+      hora: 12,
+      situacao: 'OPEN',
+      imovel: 0,
+    },
+    {
+      titulo: 'Devolver ligacao para o comprador',
+      responsavel: 4,
+      dias: -1,
+      hora: 18,
+      situacao: 'OPEN',
+      cliente: 5,
+    },
+    {
+      titulo: 'Conferir o laudo de vistoria',
+      responsavel: 2,
+      dias: -1,
+      hora: 9,
+      situacao: 'OPEN',
+    },
+    // Concluida **depois** do prazo: nao esta vencida, esta concluida.
+    {
+      titulo: 'Enviar as fotos novas para o proprietario',
+      responsavel: 3,
+      dias: -3,
+      hora: 15,
+      situacao: 'DONE',
+      cliente: 2,
+    },
+    {
+      titulo: 'Confirmar a chave com o sindico',
+      responsavel: 3,
+      dias: 0,
+      hora: 19,
+      situacao: 'OPEN',
+      cliente: 1,
+    },
+    {
+      titulo: 'Montar a proposta para a Leticia',
+      responsavel: 3,
+      dias: 1,
+      hora: 11,
+      situacao: 'OPEN',
+      cliente: 2,
+      negociacao: 3,
+    },
+    {
+      titulo: 'Agendar avaliacao do imovel da esquina',
+      responsavel: 4,
+      dias: 2,
+      hora: 14,
+      situacao: 'OPEN',
+      imovel: 6,
+    },
+    {
+      titulo: 'Retomar contato com quem visitou e nao voltou',
+      responsavel: 4,
+      dias: 5,
+      hora: 10,
+      situacao: 'OPEN',
+      negociacao: 6,
+    },
+    {
+      titulo: 'Revisar os anuncios que estao fora do ar',
+      responsavel: 1,
+      dias: 7,
+      hora: 15,
+      situacao: 'OPEN',
+    },
+    {
+      titulo: 'Fechar a escala de plantao do fim de semana',
+      responsavel: 2,
+      dias: 10,
+      hora: 17,
+      situacao: 'OPEN',
+    },
+    {
+      titulo: 'Preparar o material da feira de imoveis',
+      responsavel: 0,
+      dias: null,
+      situacao: 'OPEN',
+    },
+    {
+      titulo: 'Estudar a mudanca na taxa de financiamento',
+      responsavel: 3,
+      dias: null,
+      situacao: 'OPEN',
+    },
+    {
+      titulo: 'Reservar a sala de reuniao para quinta',
+      responsavel: 4,
+      dias: -6,
+      hora: 10,
+      situacao: 'CANCELED',
+    },
+  ];
+}
+
+/**
+ * Hoje mais um deslocamento, no fuso de quem roda o seed.
+ *
+ * Local de proposito: a agenda da tela recorta o periodo pelo relogio de quem
+ * olha, e uma visita gravada "as 9h UTC" apareceria as 6h da manha para quem
+ * esta em Brasilia — horario em que ninguem visita imovel.
+ */
+function daqui(dias: number, hora: number, minuto = 0): Date {
+  const data = new Date();
+  data.setDate(data.getDate() + dias);
+  data.setHours(hora, minuto, 0, 0);
+
+  return data;
+}
+
 const NOME_POR_TIPO: Record<PropertyType, string> = {
   APARTMENT: 'Apartamento',
   HOUSE: 'Casa',
@@ -509,7 +846,7 @@ async function main() {
     const senhaHash = await hash(SENHA, CUSTO_DE_DESENVOLVIMENTO);
 
     console.log(
-      'Criando Imobiliaria Aurora (5 pessoas, 26 imoveis, 18 leads, 12 negociacoes)...',
+      'Criando Imobiliaria Aurora (5 pessoas, 26 imoveis, 18 leads, 12 negociacoes, 15 visitas, 14 tarefas)...',
     );
     const aurora = await criarOrganizacao(prisma, {
       nome: 'Imobiliaria Aurora',
@@ -520,10 +857,12 @@ async function main() {
       imoveis: imoveisDaAurora(),
       leads: leadsDaAurora(),
       negociacoes: negociacoesDaAurora(),
+      visitas: visitasDaAurora(),
+      tarefas: tarefasDaAurora(),
     });
 
     console.log(
-      'Criando Meridiano Imoveis (2 pessoas, 4 imoveis, 4 leads, 2 negociacoes)...',
+      'Criando Meridiano Imoveis (2 pessoas, 4 imoveis, 4 leads, 2 negociacoes, 2 visitas, 2 tarefas)...',
     );
     await criarOrganizacao(prisma, {
       nome: 'Meridiano Imoveis',
@@ -631,10 +970,45 @@ async function main() {
         { lead: 0, etapa: 'Proposta', imovel: 0, valorEsperado: 1_190_000 },
         { lead: 1, etapa: 'Contato feito', imovel: 1, valorEsperado: 88_800 },
       ],
+      visitas: [
+        {
+          imovel: 0,
+          cliente: 0,
+          responsavel: 1,
+          dias: 0,
+          hora: 11,
+          situacao: 'CONFIRMED',
+        },
+        {
+          imovel: 1,
+          cliente: 1,
+          responsavel: 0,
+          dias: 2,
+          hora: 15,
+          situacao: 'SCHEDULED',
+        },
+      ],
+      tarefas: [
+        {
+          titulo: 'Reenviar o contrato para assinatura',
+          responsavel: 1,
+          dias: -2,
+          hora: 16,
+          situacao: 'OPEN',
+          cliente: 0,
+        },
+        {
+          titulo: 'Atualizar as fotos da cobertura',
+          responsavel: 0,
+          dias: null,
+          situacao: 'OPEN',
+          imovel: 0,
+        },
+      ],
     });
 
     console.log(
-      'Criando corretor autonomo (1 pessoa, 3 imoveis, 2 leads, 1 negociacao)...',
+      'Criando corretor autonomo (1 pessoa, 3 imoveis, 2 leads, 1 negociacao, 1 visita, 2 tarefas)...',
     );
     await criarOrganizacao(prisma, {
       nome: 'Paulo Reis Imoveis',
@@ -717,6 +1091,35 @@ async function main() {
           etapa: 'Visita agendada',
           imovel: 1,
           valorEsperado: 540_000,
+        },
+      ],
+      visitas: [
+        {
+          imovel: 1,
+          cliente: 0,
+          responsavel: 0,
+          dias: 1,
+          hora: 10,
+          situacao: 'CONFIRMED',
+          observacoes: 'Levar a planta impressa.',
+        },
+      ],
+      tarefas: [
+        {
+          titulo: 'Confirmar documentacao do financiamento',
+          responsavel: 0,
+          dias: -1,
+          hora: 14,
+          situacao: 'OPEN',
+          negociacao: 0,
+        },
+        {
+          titulo: 'Responder o e-mail do Elias',
+          responsavel: 0,
+          dias: 0,
+          hora: 18,
+          situacao: 'OPEN',
+          cliente: 1,
         },
       ],
     });
@@ -856,6 +1259,8 @@ async function criarOrganizacao(
     imoveis: ImovelDoSeed[];
     leads?: LeadDoSeed[];
     negociacoes?: NegociacaoDoSeed[];
+    visitas?: VisitaDoSeed[];
+    tarefas?: TarefaDoSeed[];
   },
 ): Promise<string> {
   const organizacao = await prisma.organization.create({
@@ -976,11 +1381,28 @@ async function criarOrganizacao(
     idsDeLeads.push(leadCriado.id);
   }
 
-  await criarNegociacoes(prisma, {
+  const idsDeNegociacoes = await criarNegociacoes(prisma, {
     organizationId: organizacao.id,
     negociacoes: dados.negociacoes ?? [],
     idsDeLeads,
     idsDeImoveis,
+  });
+
+  await criarVisitas(prisma, {
+    organizationId: organizacao.id,
+    visitas: dados.visitas ?? [],
+    idsDeImoveis,
+    idsDeLeads,
+    vinculos,
+  });
+
+  await criarTarefas(prisma, {
+    organizationId: organizacao.id,
+    tarefas: dados.tarefas ?? [],
+    idsDeImoveis,
+    idsDeLeads,
+    idsDeNegociacoes,
+    vinculos,
   });
 
   return organizacao.id;
@@ -1001,9 +1423,9 @@ async function criarNegociacoes(
     idsDeLeads: string[];
     idsDeImoveis: string[];
   },
-): Promise<void> {
+): Promise<string[]> {
   if (dados.negociacoes.length === 0) {
-    return;
+    return [];
   }
 
   const etapas = await prisma.pipelineStage.findMany({
@@ -1012,6 +1434,7 @@ async function criarNegociacoes(
   });
 
   const porNome = new Map(etapas.map((etapa) => [etapa.name, etapa]));
+  const criadas: string[] = [];
 
   for (const negociacao of dados.negociacoes) {
     const etapa = porNome.get(negociacao.etapa);
@@ -1039,7 +1462,8 @@ async function criarNegociacoes(
 
     const fechada = etapa.isWon || etapa.isLost;
 
-    await prisma.deal.create({
+    const criada = await prisma.deal.create({
+      select: { id: true },
       data: {
         organizationId: dados.organizationId,
         leadId,
@@ -1055,6 +1479,106 @@ async function criarNegociacoes(
         lostReason: etapa.isLost ? negociacao.motivoDaPerda : null,
       },
     });
+
+    criadas.push(criada.id);
+  }
+
+  return criadas;
+}
+
+/**
+ * As visitas, depois dos imoveis e dos leads.
+ *
+ * Quem conduz vem do indice declarado, e **nao** do responsavel pelo cliente:
+ * e justamente a divergencia entre os dois que produz o caso da segunda porta
+ * de visibilidade — o Tiago conduzindo a visita da cliente da Bianca.
+ */
+async function criarVisitas(
+  prisma: PrismaClient,
+  dados: {
+    organizationId: string;
+    visitas: VisitaDoSeed[];
+    idsDeImoveis: string[];
+    idsDeLeads: string[];
+    vinculos: string[];
+  },
+): Promise<void> {
+  for (const visita of dados.visitas) {
+    const propertyId = dados.idsDeImoveis[visita.imovel];
+
+    if (!propertyId) {
+      throw new Error(
+        `Visita aponta para o imovel ${visita.imovel}, que nao existe nesta organizacao.`,
+      );
+    }
+
+    const inicio = daqui(visita.dias, visita.hora);
+    const fim = new Date(
+      inicio.getTime() + (visita.duracaoEmHoras ?? 1) * 60 * 60 * 1000,
+    );
+
+    await prisma.visit.create({
+      data: {
+        organizationId: dados.organizationId,
+        propertyId,
+        leadId:
+          visita.cliente === null ? null : dados.idsDeLeads[visita.cliente],
+        assignedMemberId: dados.vinculos[visita.responsavel],
+        startsAt: inicio,
+        endsAt: fim,
+        status: visita.situacao,
+        notes: visita.observacoes,
+      },
+    });
+  }
+}
+
+/**
+ * As tarefas, por ultimo: elas podem apontar para negociacao, que depende de
+ * lead e imovel.
+ *
+ * `completedAt` sai da situacao, como na API: `DONE` fecha, e qualquer outra
+ * deixa nulo. Gravar data de conclusao numa tarefa aberta criaria no banco um
+ * estado que o servico nunca produz — e um dia alguem o encontraria e trataria
+ * como possivel.
+ */
+async function criarTarefas(
+  prisma: PrismaClient,
+  dados: {
+    organizationId: string;
+    tarefas: TarefaDoSeed[];
+    idsDeImoveis: string[];
+    idsDeLeads: string[];
+    idsDeNegociacoes: string[];
+    vinculos: string[];
+  },
+): Promise<void> {
+  for (const tarefa of dados.tarefas) {
+    const prazo =
+      tarefa.dias === null ? null : daqui(tarefa.dias, tarefa.hora ?? 12);
+
+    await prisma.task.create({
+      data: {
+        organizationId: dados.organizationId,
+        title: tarefa.titulo,
+        assignedMemberId: dados.vinculos[tarefa.responsavel],
+        dueAt: prazo,
+        status: tarefa.situacao,
+        completedAt: tarefa.situacao === 'DONE' ? new Date() : null,
+        leadId:
+          tarefa.cliente === undefined
+            ? null
+            : dados.idsDeLeads[tarefa.cliente],
+        dealId:
+          tarefa.negociacao === undefined
+            ? null
+            : dados.idsDeNegociacoes[tarefa.negociacao],
+        propertyId:
+          tarefa.imovel === undefined
+            ? null
+            : dados.idsDeImoveis[tarefa.imovel],
+      },
+    });
   }
 }
 
@@ -1068,7 +1592,7 @@ function imprimirResumo(): void {
     ['  helena@exemplo.com', 'OWNER', 've e edita tudo, exclui'],
     ['  rafael@exemplo.com', 'ADMIN', 've e edita tudo, exclui'],
     ['  celina@exemplo.com', 'MANAGER', 've e edita tudo, NAO exclui'],
-    ['  tiago@exemplo.com', 'AGENT', '5 leads; ve so os dele'],
+    ['  tiago@exemplo.com', 'AGENT', '5 leads; conduz visita da Bianca'],
     ['  bianca@exemplo.com', 'AGENT', '5 leads; ve so os dela'],
     ['Meridiano Imoveis', '4 im./4 leads', '2 negociacoes · 1 lead na fila'],
     ['  otavio@exemplo.com', 'OWNER', ''],
@@ -1086,6 +1610,12 @@ function imprimirResumo(): void {
   console.log(
     '\n  Entre com dora@exemplo.com para ver o seletor de organizacao:\n' +
       '  ele aparece somente para quem tem mais de um vinculo ativo.\n',
+  );
+
+  console.log(
+    '  Entre com tiago@exemplo.com e abra a agenda daqui a dois dias:\n' +
+      '  ele conduz a visita de uma cliente da Bianca. Ve o nome e o telefone\n' +
+      '  dela, e **nao** ve o link para a ficha — a decisao de 21/10/2026.\n',
   );
 }
 

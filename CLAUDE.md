@@ -48,7 +48,19 @@ Em 21/10/2026 entrou o **B7** — funil de negociações — com API e tela. Sã
 
 **Outro teste encontrou um vazamento real**, o segundo em dois dias: a listagem excluía negociação de cliente excluído, mas a consulta por id ainda devolvia o nome dele — o `carregar` filtrava só o `deletedAt` da negociação. Atendido um pedido de LGPD, o nome sobreviveria por essa porta. O filtro agora é o mesmo nos dois caminhos.
 
-Ainda não existem agenda, dashboard nem catálogo público.
+Em 21/10/2026 entrou a **API do B8** — agenda e tarefas —, e em 22/10/2026 as **telas**: `/painel/agenda`, `/painel/agenda/nova`, `/painel/agenda/[id]` e `/painel/tarefas`. São **697 testes**.
+
+**A visibilidade ganhou uma segunda porta, e isso é mudança de regra, não detalhe.** Em `Visit` e `Task` o responsável é obrigatório e o cliente é opcional — o inverso de `Deal`. Então enxerga quem responde pelo **registro** ou pelo **cliente**: o gerente manda o Tiago conduzir a visita da cliente da Bianca, e o Tiago precisa ver, porque vai encontrar a pessoa. O que ele recebe do cliente é o **mínimo do encontro** — nome e telefone, e nada mais —, e a ficha do cliente continua respondendo 404 para ele. A contrapartida: atribuir passou a ser uma forma de revelar um contato, então só `MANAGER` para cima atribui e a auditoria registra `revelouCliente`.
+
+Na tela, essa decisão aparece em **um** lugar concreto: o link para a ficha do cliente só existe quando `cliente.acessivel` é `true`. Oferecê-lo sempre levaria a um 404, e quem clicasse concluiria que o sistema quebrou — quando ele está funcionando como deve. Verificado contra o servidor: o corretor que perde a condução da visita passa a receber 404 nela.
+
+**A agenda é lista agrupada por dia, não grade** — dia, semana e mês são recortes da mesma lista, com semana por padrão. Grade de sete colunas em tela de 360px só funciona com rolagem horizontal, e o aparelho do corretor é o celular. A conversão de fuso mora num lugar só (`apps/web/lib/agenda.ts`): o `datetime-local` entrega hora local sem fuso, que o contrato recusa, e a janela pedida à API é montada em hora local — em UTC, ela cortaria as visitas de sábado à noite.
+
+**A tarefa não tem tela de detalhe**, por decisão: título, prazo e situação não justificam uma tela, e baixa que custa dois cliques é baixa que não acontece. Criar, concluir, reabrir e mudar o prazo acontecem na própria lista.
+
+O seed cria **15 visitas e 18 tarefas**, com datas **relativas a hoje** — data fixa envelheceria e em um mês a agenda do seed estaria toda no passado. Uma linha existe só para provar a segunda porta: a visita do cliente da Bianca conduzida pelo Tiago, e o seed imprime como chegar nela.
+
+Ainda não existem dashboard nem catálogo público.
 
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 

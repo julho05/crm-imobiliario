@@ -111,7 +111,7 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B5 | Leads — *concluído em 21/10/2026* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
 | B6 | Fila de não atribuídos — *concluído em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
 | B7 | Funil — *concluído em 21/10/2026* | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
-| B8 | Agenda e tarefas — *API concluída em 21/10/2026; telas pendentes* | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
+| B8 | Agenda e tarefas — *concluído em 22/10/2026* | Datas gravadas em UTC e exibidas no fuso local; mesma visibilidade do lead | B5 |
 | B9 | Dashboard | Conteúdo muda por papel; organização nova mostra primeiros passos, não zeros | B1, B5 |
 | B10 | Desempenho de listagem | Paginação em todas as listas; **teste que conta consultas** e falha se a listagem fizer uma por item | B1, B5 |
 
@@ -215,7 +215,27 @@ Outras decisões:
 
 **Uma armadilha nova, registrada:** filtrar por relação opcional no Prisma (`lead: { deletedAt: null }`) **exige que a relação exista**, então a visita sem cliente desapareceria da agenda. A forma correta é `OR: [{ leadId: null }, { lead: {...} }]`. É engano que passa no caminho feliz, porque o caso de teste costuma ter cliente.
 
-Pendente deste item: as **telas** (`/painel/agenda` e `/painel/tarefas`) e o seed, que ainda não cria visita nem tarefa.
+### Telas de agenda e tarefas — **concluídas em 22/10/2026**
+
+`/painel/agenda`, `/painel/agenda/nova`, `/painel/agenda/[id]` e `/painel/tarefas`, mais os dois itens novos no menu e o contador de tarefas vencidas no `/painel`.
+
+Quatro decisões de interface:
+
+- **Dia, semana e mês são recortes da mesma lista, não três calendários.** Os três períodos que o §8 pede existem, e nenhum deles é grade. O motivo é o §7: a página tem de funcionar em tela de 360px, e grade de sete colunas nessa largura só funciona com rolagem horizontal — a interação que mais se perde no celular, que é o aparelho que o corretor leva para a visita. Agrupada por dia, a mesma informação desce verticalmente. O padrão é a **semana**: dia é curto demais para "o que eu tenho pela frente?", e mês, em lista, é longo demais para ser a primeira coisa que aparece
+- **A tarefa não tem tela de detalhe**, e o mapa de telas já previa isso. Ela tem título, prazo e situação; uma tela inteira para três campos faria da baixa dois cliques e uma navegação, e a tarefa é justamente o registro que não pode dar trabalho — se der, ninguém anota e a lista morre. Criar, concluir, reabrir e mudar o prazo acontecem todos na lista
+- **O link para a ficha do cliente é condicional**, e é aqui que a decisão de 21/10/2026 aparece na tela: a visita traz nome e telefone mesmo para quem não responde pelo cliente, mas o link só existe quando `cliente.acessivel` é `true`. Oferecê-lo sempre levaria a um 404, e quem clicasse concluiria que o sistema está quebrado — quando ele está funcionando exatamente como deve. O bloco sem link vem com uma linha explicando por quê
+- **O telefone é repetido na tela da visita**, ao contrário do que a tela da negociação faz. Lá, duplicar dado pessoal por conveniência que um link resolve não se justifica. Aqui, quem conduz a visita do cliente de um colega **não alcança** a ficha, e sem o telefone a decisão de deixá-lo ver a visita não serviria para nada
+
+Uma conversão entra em dois pontos e mora num lugar só (`lib/agenda.ts`): o `datetime-local` entrega hora local **sem fuso**, que o contrato recusa de propósito, e o período pedido à API é montado em hora local antes de virar ISO. Pedir a janela em UTC cortaria as visitas de sábado à noite — que são as que existem.
+
+### Seed com agenda — **22/10/2026**
+
+Quinze visitas e dezoito tarefas nas três organizações. Dois pontos de método:
+
+- **As datas são relativas a hoje**, não fixas. Data fixa envelhece: em um mês, toda a agenda do seed estaria no passado, e a tela que mais importa conferir — "o que tenho esta semana" — nasceria vazia
+- **Uma linha existe só para provar a segunda porta**: a visita do cliente da Bianca conduzida pelo Tiago. Entrando como Tiago, ela aparece com o nome e o telefone da cliente e **sem** link para a ficha, que responde 404 para ele. Sem esse registro no banco, a decisão de 21/10/2026 não teria como ser vista funcionando, e o seed imprime a instrução de como chegar nela
+
+**Verificação.** 697 testes na API, `npm run build` passando nos dois apps. O percurso foi exercitado contra o servidor em execução: agendar atribuindo a outra pessoa, editar horário, mudar situação, criar tarefa, o erro por campo do fim antes do início, e os três códigos que a matriz decide — o corretor atribuindo recebe **403**, o gerente **200**, e o corretor que perdeu a condução da visita passa a receber **404** nela. As telas continuam **sem teste de componente**, pela decisão de 21/10/2026.
 
 ---
 
