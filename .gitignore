@@ -42,3 +42,6 @@ apps/*/AGENTS.md
 
 # Client do Prisma — gerado por "prisma generate", que roda no dev e no build
 apps/api/src/generated/
+
+# Midia do adaptador de desenvolvimento (item B4). Nunca versionada.
+.midia-dev/

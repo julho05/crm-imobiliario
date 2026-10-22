@@ -107,7 +107,7 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B1 | CRUD de imóveis — *concluído em 21/10/2026* | `code` único por organização, com erro legível na colisão; `purpose = BOTH` exige os dois preços; `AGENT` edita só os dele e recebe **403** nos outros da mesma organização, 404 nos de outra | A12 |
 | B2 | Publicação — *concluído em 21/10/2026* | `status` e `publishedAt` independentes; publicar/despublicar registrado em auditoria | B1 |
 | B3 | Privacidade do endereço | `addressVisibility` nasce em `NEIGHBORHOOD_ONLY`; teste confirma que a API pública **não** devolve rua, número, CEP nem coordenada exata quando não deve | B1 |
-| B4 | Fotos e mídia | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
+| B4 | Fotos e mídia — *API concluída em 22/10/2026; telas pendentes* | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
 | B5 | Leads — *concluído em 21/10/2026* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
 | B6 | Fila de não atribuídos — *concluído em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
 | B7 | Funil — *concluído em 21/10/2026* | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
@@ -134,6 +134,32 @@ Duas pontas soltas, fechadas no mesmo dia:
 O que **não** entrou: fotos (B4, depende do armazenamento de objetos).
 
 **Verificação.** A API tem 421 testes. As telas foram conferidas por tipo, lint e build, e o percurso cadastro → imóvel → publicação foi exercitado contra o servidor em execução. **Não há teste de componente no site** — decisão de 21/10/2026, para não acrescentar `@testing-library/react` e `jsdom` agora. A consequência é concreta: a lógica do formulário (erro por campo, preço por finalidade, vazio que apaga na edição) não tem rede de proteção automatizada.
+
+### Fotos e mídia — API **concluída em 22/10/2026**
+
+Sete rotas sob `/imoveis/:imovelId/midia`, com 30 testes. O modelo de dados já existia desde a Fase 1 — `PropertyMedia` com `objectKey`, `isCover` e `@@unique([propertyId, position])` —, então não houve migration: o item é a porta de armazenamento, a autorização e o fluxo de upload.
+
+**O upload é em dois passos, e o arquivo não passa pela API.** A API autoriza, confere limite e tipo, e devolve uma URL assinada de 10 minutos; o navegador envia direto ao armazenamento; depois informa a chave e a linha é criada. O motivo é o plano de hospedagem: receber 20 fotos de 5 MB por requisição ocuparia, segurando bytes em memória, o mesmo processo que atende o corretor.
+
+**A porta (`ArmazenamentoDeMidia`) é o que permitiu construir o item sem a conta do R2**, como o e-mail fez com `RemetenteDeEmail`. O adaptador de desenvolvimento grava em disco e assina com HMAC, reproduzindo a forma de uma URL pré-assinada do S3 — chave, tipo, tamanho e prazo dentro da assinatura. `MIDIA_PROVIDER=local` é recusado em produção na inicialização. O adaptador do R2, com as duas dependências do SDK, entra quando as credenciais existirem: **é a única parte do item que continua pendente**, e a decisão de não escrevê-lo às cegas foi deliberada — dependência que serve código não exercitado é dependência que ninguém sabe se está certa.
+
+Decisões tomadas durante a implementação:
+
+- **A chave do objeto carrega organização e imóvel** (`organizacoes/<org>/imoveis/<imovel>/<uuid>.<ext>`), e isso não é organização de pasta: entre os dois passos a chave passa pelo navegador, e chave vinda do cliente é pedido, não declaração. Sem conferir o prefixo, alguém registraria no imóvel dele uma chave de outra organização, e a resposta passaria a servir aquele objeto. O `uuid` evita enumeração — num bucket com leitura pública, conhecer a chave é poder ler o arquivo
+- **O limite é conferido duas vezes**, ao assinar e ao registrar. Não é desconfiança do primeiro: entre os dois passos cabe outra aba, e duas URLs emitidas com uma vaga restante registrariam vinte e uma
+- **A capa nasce sozinha e nunca fica vazia.** A primeira mídia pública vira capa, e remover a capa promove a próxima. O banco já garantia "no máximo uma"; o que faltava era não deixar o imóvel **sem** capa depois de uma remoção — anúncio sem capa não tem o que mostrar na lista do catálogo, e ninguém volta para marcar
+- **`DOCUMENT` nunca é capa**, nem por escolha nem por ser o único arquivo. Matrícula não é vitrine
+- **A reordenação recebe a lista inteira** e é aplicada em dois passos dentro da transação, porque `@@unique([propertyId, position])` colide no meio do caminho: todas vão primeiro para posições negativas, que nenhuma linha válida ocupa. Lista parcial é recusada, porque deixaria mídia fora da ordem
+- **A remoção apaga a linha antes do objeto.** Se o armazenamento falhar, sobra um objeto órfão, que não aparece em tela nenhuma; na ordem inversa, sobraria uma linha apontando para arquivo inexistente — imagem quebrada no anúncio, que é o erro que o cliente vê
+- **A chave do objeto não vai para a auditoria.** Ela é o endereço do arquivo, e o log é lido por mais gente do que quem pode abrir a foto. Há teste para isso
+- **Uma função de autorização, não duas.** Listar exige `imovel:ver` (`ORG` para os quatro papéis, porque o corretor precisa ver as fotos de qualquer imóvel da casa para oferecê-lo) e escrever exige `imovel:editar` (`OWN` para o `AGENT`, que recebe **403** no imóvel do colega). O que muda é o `@Exige` da rota; o serviço lê o escopo do contexto
+- **O receptor do adaptador local não tem guarda de sessão**, e isso é o fluxo real: no R2 o envio vai do navegador para a Cloudflare, onde o cookie não chega. Quem autoriza é a assinatura. Guarda de sessão ali testaria um fluxo que não é o de produção e deixaria a assinatura sem exercício
+
+**Verificação.** 752 testes. Os casos que importam são os de recusa, e todos passam pelo fluxo completo — pedir a URL, enviar para ela, registrar: token alterado **403**, tipo diferente do assinado **400**, arquivo maior que o autorizado **413**, chave de outra organização **404**, chave de outro imóvel da mesma organização **404**, travessia de diretório **404**, vigésima primeira mídia **400**, e o corretor pedindo URL para o imóvel do colega **403**.
+
+Pendente deste item: as **telas** (upload no formulário de imóvel, capa e ordem) e o adaptador do R2.
+
+---
 
 ### Leads — API **concluída em 21/10/2026**
 

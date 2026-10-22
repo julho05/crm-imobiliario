@@ -10,6 +10,7 @@ import { LeadsModule } from './leads/leads.module';
 import { NegociacoesModule } from './negociacoes/negociacoes.module';
 import { AgendaModule } from './agenda/agenda.module';
 import { PainelModule } from './painel/painel.module';
+import { MidiaModule } from './midia/midia.module';
 
 // O AutorizacaoModule continua no grafo por conta propria, e nao so por ser
 // dependencia de quem o usa: ele nao tem rota, mas a injecao de dependencia da
@@ -28,6 +29,7 @@ import { PainelModule } from './painel/painel.module';
     NegociacoesModule,
     AgendaModule,
     PainelModule,
+    MidiaModule,
   ],
   controllers: [HealthController],
   providers: [],

@@ -72,6 +72,20 @@ Três decisões de produto que vale não reabrir:
 
 **Um defeito do B8 apareceu ao montar o painel e foi corrigido:** `acessivel`, no recorte do cliente da agenda, comparava só a atribuição. Para `MANAGER` e acima — escopo `ORG` — a resposta dizia `false` em toda visita de cliente de outra pessoa, e a tela escondia um link que funcionaria. Errava para o lado seguro, e por isso nenhum teste de isolamento o pegou: isolamento prova o que **não** deve aparecer, e este era algo permitido que não aparecia. Agora o cálculo considera o escopo, com teste para os quatro papéis.
 
+Em 22/10/2026 entrou a **API do B4** — fotos e documentos do imóvel —, com 30 testes. São **752 testes**. As telas ainda não existem.
+
+**O arquivo não passa pela API.** Dois passos: ela autoriza, confere limite e tipo e devolve URL assinada de 10 minutos; o navegador envia direto ao armazenamento e depois registra a chave. Receber 20 fotos de 5 MB por requisição ocuparia, segurando bytes em memória, o mesmo processo que atende o corretor.
+
+**O item foi construído sem a conta do R2**, pela porta `ArmazenamentoDeMidia` — o mesmo arranjo do e-mail. O adaptador de desenvolvimento grava em disco e assina com HMAC, reproduzindo a forma da URL pré-assinada do S3; `MIDIA_PROVIDER=local` é recusado em produção na inicialização. **O adaptador do R2 é o que continua pendente**, com as duas dependências do SDK, e não foi escrito às cegas de propósito: dependência que serve código não exercitado é dependência que ninguém sabe se está certa.
+
+Três decisões a não reabrir:
+
+- **A chave do objeto carrega organização e imóvel**, e o prefixo é conferido no registro: entre os dois passos a chave passa pelo navegador, e chave vinda do cliente é pedido, não declaração. O `uuid` no fim evita enumeração
+- **A capa nasce sozinha e nunca fica vazia** — a primeira mídia pública vira capa, e remover a capa promove a próxima. `DOCUMENT` nunca é capa
+- **A remoção apaga a linha antes do objeto**: a falha deixa órfão invisível, em vez de linha apontando para arquivo inexistente, que viraria imagem quebrada no anúncio
+
+Limites: **20 arquivos por imóvel, 5 MB cada**, JPEG/PNG/WebP e PDF.
+
 Ainda não existe catálogo público.
 
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.

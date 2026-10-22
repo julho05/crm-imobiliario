@@ -215,6 +215,37 @@ cerca de US$ 0,45/mês.
 Todos os provedores falam o mesmo protocolo (o do S3), então trocar depois é
 configuração, não reescrita.
 
+#### Como o código fala com o armazenamento (22/10/2026, item B4)
+
+Por uma **porta** (`ArmazenamentoDeMidia`), e nunca por um SDK direto — o mesmo
+arranjo do e-mail, e pelo mesmo motivo prático: o destino está decidido, mas a
+conta e as credenciais do R2 ainda não existem, e adaptador que não pode ser
+exercitado não deveria carregar o item inteiro.
+
+A porta promete três coisas: gerar URL de **envio** de validade curta (10
+minutos), gerar URL de **leitura** e remover objeto. Não promete redimensionar
+nem converter formato — isso exigiria processar imagem no servidor, que é
+trabalho de worker, e o plano não tem worker. Quando necessário, o recorte
+acontece no navegador antes do envio, ou na transformação de imagem do próprio
+R2, que é configuração.
+
+O adaptador de desenvolvimento (`MIDIA_PROVIDER=local`) grava em disco e assina
+as URLs com HMAC, reproduzindo a forma de uma URL pré-assinada do S3 — chave,
+tipo, tamanho e prazo dentro do que foi assinado. **É recusado em produção na
+inicialização**, como o `EMAIL_PROVIDER=log`: servir foto pelo processo da API é
+exatamente o que a escolha do R2 evitou.
+
+O arquivo **não passa pela API** em nenhum dos dois adaptadores. O navegador
+envia direto ao armazenamento, com a URL assinada que a API emitiu depois de
+conferir a permissão. Receber 20 fotos de 5 MB por requisição significaria
+ocupar o processo que atende o corretor segurando bytes em memória para depois
+reenviá-los.
+
+Entra junto uma consequência para a Fase 3: no R2, foto e planta poderão ser
+servidas por domínio público (é o que faz o catálogo não gastar CPU do plano),
+mas **documento nunca** — matrícula e contrato continuam atrás de URL assinada,
+porque `DOCUMENT` não é material de vitrine.
+
 ### Rate limiting (A11): sobre o MySQL, não em memória
 
 O suporte não informa contagem de processos por aplicação, e o limite de 120
