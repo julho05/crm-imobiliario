@@ -106,7 +106,7 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 |---|---|---|---|
 | B1 | CRUD de imóveis — *concluído em 21/10/2026* | `code` único por organização, com erro legível na colisão; `purpose = BOTH` exige os dois preços; `AGENT` edita só os dele e recebe **403** nos outros da mesma organização, 404 nos de outra | A12 |
 | B2 | Publicação — *concluído em 21/10/2026* | `status` e `publishedAt` independentes; publicar/despublicar registrado em auditoria | B1 |
-| B3 | Privacidade do endereço | `addressVisibility` nasce em `NEIGHBORHOOD_ONLY`; teste confirma que a API pública **não** devolve rua, número, CEP nem coordenada exata quando não deve | B1 |
+| B3 | Privacidade do endereço — *concluído em 23/10/2026, junto com o C2* | `addressVisibility` nasce em `NEIGHBORHOOD_ONLY`; teste confirma que a API pública **não** devolve rua, número, CEP nem coordenada exata quando não deve | B1 |
 | B4 | Fotos e mídia — *concluído em 23/10/2026; só o adaptador do R2 pendente* | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
 | B5 | Leads — *concluído em 21/10/2026* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
 | B6 | Fila de não atribuídos — *concluído em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
@@ -324,12 +324,35 @@ Depende de: B1 a B4 · mecanismo anti-spam decidido · texto do aviso de privaci
 | # | Tarefa | Critério de aceitação verificável | Depende de |
 |---|---|---|---|
 | C1 | Vitrine `/o/[slug]` | Mostra só `AVAILABLE` e `RESERVED`, este com etiqueta; teste confirma que `DRAFT`, `SOLD`, `RENTED`, `INACTIVE` e excluído **não** aparecem | B2 |
-| C2 | DTO público | Construído campo a campo; **teste que falha se um campo novo do `Property` vazar** na resposta pública | B3 |
+| C2 | DTO público — *concluído em 23/10/2026* | Construído campo a campo; **teste que falha se um campo novo do `Property` vazar** na resposta pública | B3 |
 | C3 | Redirecionamento de slug | Slug antigo responde 301 para o novo; adotar slug que ainda redireciona é recusado | A2 |
 | C4 | Busca e filtros | Filtros de `filtrosDoCatalogoSchema`; teste confirma que **não** há filtro por rua, CEP ou coordenada | C2 |
 | C5 | Captura de lead | Consentimento explícito obrigatório; grava versão do aviso e **hash** do IP; resposta não devolve IDs internos; lead vai ao responsável do imóvel ou à fila | B5, C1 |
 | C6 | Anti-spam | Limite por IP comprovado em teste; mecanismo escolhido registrado em `docs/` | C5 |
 | C7 | SEO e responsividade | Título, descrição e dados estruturados por imóvel; páginas utilizáveis em tela de 360px | C1 |
+
+### API pública — **C2 concluído em 23/10/2026, e com ele o B3**
+
+Três rotas em `apps/api/src/catalogo/`, sob `/api/publico/organizacoes/:slug`: a organização, a vitrine paginada e o anúncio por slug. São **788 testes**.
+
+**O teste que define o item falha sem ninguém editá-lo.** `test/catalogo/vazamento.http.spec.ts` lê `Prisma.PropertyScalarFieldEnum` — a lista de colunas que o Prisma gera a partir do schema — e exige que **cada** coluna esteja declarada como pública ou privada em `resposta-publica.ts`. Uma migration que acrescente coluna quebra a suíte até alguém decidir de que lado ela fica. O mecanismo foi verificado na prática, não presumido: uma coluna `comissao` acrescentada ao schema apareceu em `semDecisao` e derrubaria o caso.
+
+Um teste que apenas conferisse os campos da resposta não cumpriria o critério: campo que ninguém mapeou não aparece na resposta, e o vazamento nasceria no dia em que alguém o mapeasse. A mesma classificação cobre `Organization` e `PropertyMedia`.
+
+Decisões tomadas durante a implementação:
+
+- **O DTO público não reaproveita nada do DTO do CRM.** Aquele carrega `code`, `zipCode`, `street`, `number` e o responsável; partir dele e remover campos é lista negra escrita de outro jeito, e `permissions.md` §5 proíbe exatamente isso
+- **Um recorte, em um lugar só** (`visivel()`), usado pelas três consultas. No B7 a listagem e a consulta por id tinham recortes separados, a segunda esqueceu um filtro e o nome de um cliente excluído saiu por ali. Lá era o CRM; aqui é a porta da rua. Há teste separado para a listagem e para o acesso direto pelo slug, com os quatro estados comerciais
+- **Quatro condições, e a quarta é a que se esquece:** publicado, estado visível, não excluído e **organização ativa**. Sem a última, suspender uma conta deixaria a vitrine no ar
+- **Tudo responde 404 — slug inexistente, organização suspensa, imóvel em rascunho.** Não há sessão para negar, e 403 diria ao visitante que aquele endereço existe e está escondido
+- **`DOCUMENT` não é filtrado depois de carregado: ele não é lido.** A consulta de mídia pede só `PHOTO` e `FLOORPLAN`, então matrícula e contrato não saem do banco — nenhuma mudança futura no DTO consegue deixá-los escapar
+- **O `select` repete a lista branca no nível do banco.** O que não é lido não pode ser devolvido por engano
+- **Ordenado por `publishedAt`, não por `createdAt`:** um imóvel cadastrado em março e publicado hoje tem de aparecer primeiro
+- **A capa vem por `select` aninhado com `take: 1`** — uma consulta para a página inteira. É onde o N+1 do item B10 nasceria
+
+**Ressalva registrada:** a chave do objeto de mídia é `organizacoes/<org>/imoveis/<imovel>/…` (decisão do B4), então o `organizationId` viaja **dentro da URL da foto** — hoje dentro da assinatura, no R2 visível no caminho. Ele não sai como campo, mas sai. Aceito: é identificador opaco, não credencial, e toda rota privada deriva a organização da sessão.
+
+**Pendência que o C2 torna concreta:** a URL de leitura da mídia expira em uma hora. No catálogo público isso não serve — a página fica em cache e o robô de busca guarda o HTML. O adaptador do R2 precisa servir `PHOTO` e `FLOORPLAN` por domínio público, como a porta já prevê; `DOCUMENT` continua atrás de URL assinada, e nunca aparece aqui.
 
 ---
 

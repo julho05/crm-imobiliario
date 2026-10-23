@@ -277,7 +277,9 @@ Organization 1──N Visit, Task, Activity, PipelineStage, Invitation
 | `PropertyFeature` | notas internas, histórico, `Activity` |
 | `slug`, `publishedAt` | dados do proprietário do imóvel |
 
-**[PROPOSTA]** Com `addressVisibility = NEIGHBORHOOD_ONLY`, as coordenadas saem **deslocadas aleatoriamente** dentro de um raio, ou não saem. Devolver o ponto exato e desenhar um círculo no mapa não protege nada — o dado está no JSON.
+**[DECIDIDO 23/10/2026]** As coordenadas **não saem em nível nenhum** — nem com `FULL`. Das duas saídas que estavam em aberto (deslocar dentro de um raio ou omitir), fica a segunda, por dois motivos: não há mapa no MVP, então a coordenada não tem para que servir hoje; e coordenada deslocada é precisão falsa num JSON que qualquer pessoa lê — quem quiser o ponto exato compara dois imóveis vizinhos e estreita o raio. Quando houver mapa, o deslocamento se decide junto com ele, com raio escolhido para o que o mapa mostra. Continua valendo o motivo original: devolver o ponto exato e desenhar um círculo na tela não protege nada.
+
+**[DECIDIDO 23/10/2026]** O **CEP não sai em nível nenhum**, nem com `FULL`: em prédio, o CEP é o endereço. E `STREET_ONLY` devolve a rua **sem número e sem complemento** — o número é o que transforma "fica na Rua Tal" em "é aquela casa".
 
 **[PROPOSTA]** O `description`, preenchido livremente, costuma conter o endereço que os outros campos escondem. Nenhum desenho de banco resolve isso. Mínimo: aviso discreto no campo de descrição quando `addressVisibility != FULL`, lembrando que aquele texto é público.
 

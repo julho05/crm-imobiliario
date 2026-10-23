@@ -98,7 +98,20 @@ Três decisões a não reabrir:
 
 **Um defeito da API do B4 apareceu ao rodar a suíte limpa:** o adaptador local lia `API_PUBLIC_URL` no construtor, e a aplicação de teste sobe em porta aleatória que só se conhece depois de escutar. As URLs assinadas do teste apontavam para a porta 3000, e os 17 casos que enviam arquivo de verdade **só passavam com o `npm run dev` no ar**. Corrigido: a base é lida a cada uso e o teste a aponta para si mesmo. A lição vale para o próximo adaptador — valor de ambiente lido no construtor congela o que o teste ainda não sabe.
 
-Ainda não existe catálogo público.
+Em 23/10/2026 entrou o **C2** — a API pública do catálogo —, e com ele fechou o **B3**. São **788 testes**. Três rotas sob `/api/publico/organizacoes/:slug`. A vitrine (C1) ainda não existe: isto é só o servidor.
+
+**O teste que define o item falha sem ninguém editá-lo.** Ele lê `Prisma.PropertyScalarFieldEnum` e exige que **toda** coluna do `Property` esteja classificada como pública ou privada em `apps/api/src/catalogo/resposta-publica.ts`. Migration que acrescente coluna quebra a suíte até alguém decidir de que lado ela fica — verificado na prática com uma coluna de mentira, não presumido. Mesma classificação para `Organization` e `PropertyMedia`.
+
+Quatro decisões a não reabrir:
+
+- **O DTO público não reaproveita o do CRM.** Partir dele e remover campos é lista negra, que é o que o `permissions.md` §5 proíbe
+- **Coordenada e CEP não saem em nível nenhum**, nem com `FULL`. `STREET_ONLY` devolve a rua sem número e sem complemento. Registrado em `docs/data-model.md` §5
+- **Um recorte só** (`visivel()`), nas três consultas, com teste separado para a listagem e para o acesso direto — foi recorte duplicado que vazou nome de cliente excluído no B7
+- **`DOCUMENT` não é lido do banco**, em vez de ser filtrado depois. O que não é carregado não escapa por mudança futura no DTO
+
+**Pendência que o C2 torna concreta:** a URL de leitura da mídia expira em uma hora, e o catálogo público é cacheado por robô de busca. O adaptador do R2 precisa servir `PHOTO` e `FLOORPLAN` por domínio público — `DOCUMENT` continua assinado, e nunca aparece no catálogo.
+
+A vitrine pública (C1) ainda não existe.
 
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 
