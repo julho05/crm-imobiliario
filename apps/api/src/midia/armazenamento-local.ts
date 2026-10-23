@@ -48,9 +48,23 @@ type Carga = {
 export class ArmazenamentoLocal extends ArmazenamentoDeMidia {
   private readonly diretorio = resolve(process.env.MIDIA_DIR ?? '.midia-dev');
 
-  private readonly base = (
-    process.env.API_PUBLIC_URL ?? 'http://localhost:3000'
-  ).replace(/\/$/, '');
+  /**
+   * A origem que o navegador usa para alcançar a API.
+   *
+   * Lida a cada chamada, e **não** guardada no construtor. Parece detalhe e não
+   * é: a aplicação de teste sobe em porta aleatória, e só sabe qual depois de
+   * escutar — portanto depois de o adaptador existir. Com a base congelada na
+   * construção, toda URL assinada do teste apontava para a porta 3000, e os
+   * casos que enviam o arquivo de verdade só passavam quando havia um servidor
+   * de desenvolvimento no ar. Suíte que depende de processo externo é suíte que
+   * falha em máquina limpa e passa na de quem escreveu.
+   */
+  private get base(): string {
+    return (process.env.API_PUBLIC_URL ?? 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+  }
 
   async urlDeUpload(params: {
     objectKey: string;

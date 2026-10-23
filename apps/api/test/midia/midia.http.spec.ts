@@ -134,12 +134,29 @@ async function listar(cookie: string, imovelId: string): Promise<Midia[]> {
   return ((await resposta.json()) as { midias: Midia[] }).midias;
 }
 
+/** Ver `apontarArmazenamentoParaOTeste`. */
+let basePublicaOriginal: string | undefined;
+
 beforeAll(async () => {
   prisma = criarClienteDeTeste();
   app = await subirAppDeTeste();
+
+  // O adaptador local assina URLs com a origem de `API_PUBLIC_URL`, que em
+  // desenvolvimento e a porta do site. Aqui ela precisa ser a **deste** app,
+  // que escuta em porta aleatoria: sem isto, os casos que enviam o arquivo de
+  // verdade falam com a porta 3000 e so passam na maquina de quem tem o `npm
+  // run dev` no ar.
+  basePublicaOriginal = process.env.API_PUBLIC_URL;
+  process.env.API_PUBLIC_URL = app.url;
 });
 
 afterAll(async () => {
+  if (basePublicaOriginal === undefined) {
+    delete process.env.API_PUBLIC_URL;
+  } else {
+    process.env.API_PUBLIC_URL = basePublicaOriginal;
+  }
+
   await app.encerrar();
   await prisma.$disconnect();
 

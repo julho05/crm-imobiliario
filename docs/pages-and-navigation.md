@@ -216,13 +216,15 @@ Dois pontos onde a tela precisa proteger o cliente:
 
 Consequência para o item C4: filtro por área ou por dormitórios tem de **excluir** o imóvel sem o valor, nunca tratá-lo como zero.
 
-**Construído em 21/10/2026**, menos a aba de fotos. O código de referência é gerado (`AP-001`, sequencial por organização, prefixo pelo tipo) e pode ser sobrescrito — a imobiliária que já numera imóveis usa essa referência no anúncio.
+**Construído em 21/10/2026.** A mídia ficou na rota própria abaixo, construída em 23/10/2026, e não como aba daqui: o formulário tem um "salvar", e a mídia não — cada arquivo entra no instante do envio. O código de referência é gerado (`AP-001`, sequencial por organização, prefixo pelo tipo) e pode ser sobrescrito — a imobiliária que já numera imóveis usa essa referência no anúncio.
 
 ### `/painel/imoveis/[id]/fotos`
 
 Upload múltiplo com reordenação e escolha de capa. Envio por URL assinada, gerada **somente depois** da autorização completa e com validade curta.
 
 `DOCUMENT` nunca vai ao catálogo — matrícula e contrato não são material de vitrine. A tela deve separar visualmente "fotos e plantas (públicas)" de "documentos (internos)", porque a consequência de confundir é expor documento de proprietário.
+
+**Construída em 23/10/2026.** A separação virou duas seções com botões de envio próprios — "Adicionar fotos", "Adicionar planta" e "Adicionar documento" —, de modo que o tipo é escolhido antes do arquivo e não depois. A reordenação é por botão, não arrastando: o aparelho do corretor é o celular, e o caso real é escolher a capa. Detalhes e as demais decisões em [roadmap.md](roadmap.md), seção "Telas de fotos e documentos".
 
 ### `/painel/leads`
 

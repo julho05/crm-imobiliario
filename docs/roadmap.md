@@ -107,7 +107,7 @@ Depende de: Fase 1 completa, **A12 inclusive** (fechado em 21/10/2026) · campos
 | B1 | CRUD de imóveis — *concluído em 21/10/2026* | `code` único por organização, com erro legível na colisão; `purpose = BOTH` exige os dois preços; `AGENT` edita só os dele e recebe **403** nos outros da mesma organização, 404 nos de outra | A12 |
 | B2 | Publicação — *concluído em 21/10/2026* | `status` e `publishedAt` independentes; publicar/despublicar registrado em auditoria | B1 |
 | B3 | Privacidade do endereço | `addressVisibility` nasce em `NEIGHBORHOOD_ONLY`; teste confirma que a API pública **não** devolve rua, número, CEP nem coordenada exata quando não deve | B1 |
-| B4 | Fotos e mídia — *API concluída em 22/10/2026; telas pendentes* | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
+| B4 | Fotos e mídia — *concluído em 23/10/2026; só o adaptador do R2 pendente* | Upload por URL assinada gerada **só depois** da autorização, com validade curta; no máximo um `isCover` por imóvel; `DOCUMENT` nunca sai na API pública | B1, armazenamento |
 | B5 | Leads — *concluído em 21/10/2026* | Telefone **ou** e-mail obrigatório; `AGENT` vê só os dele; duplicata por telefone **sinalizada**, nunca unida automaticamente | A12 |
 | B6 | Fila de não atribuídos — *concluído em 21/10/2026* | Lead sem responsável aparece para `MANAGER` e acima, com contador no dashboard; `AGENT` não a acessa | B5 |
 | B7 | Funil — *concluído em 21/10/2026* | Negociação herda a visibilidade do lead; mover etapa registrado em auditoria; teste confirma que o funil não mostra lead de colega ao `AGENT` | B5 |
@@ -157,7 +157,32 @@ Decisões tomadas durante a implementação:
 
 **Verificação.** 752 testes. Os casos que importam são os de recusa, e todos passam pelo fluxo completo — pedir a URL, enviar para ela, registrar: token alterado **403**, tipo diferente do assinado **400**, arquivo maior que o autorizado **413**, chave de outra organização **404**, chave de outro imóvel da mesma organização **404**, travessia de diretório **404**, vigésima primeira mídia **400**, e o corretor pedindo URL para o imóvel do colega **403**.
 
-Pendente deste item: as **telas** (upload no formulário de imóvel, capa e ordem) e o adaptador do R2.
+### Telas de fotos e documentos — **concluídas em 23/10/2026**
+
+`/painel/imoveis/[id]/fotos`, com `apps/web/lib/midia.ts` (o envio em três etapas) e `apps/web/components/imoveis/galeria-de-midia.tsx` (as duas seções e as ações). O botão de entrada está no cabeçalho da tela de edição, e aparece também para quem só pode ver — ver as fotos do imóvel da casa e oferecê-lo ao cliente é exatamente o que `imovel:ver` com escopo `ORG` permite.
+
+**Rota própria, e não uma seção do formulário.** O formulário é um envio só, com cinco seções que a pessoa preenche e salva; a mídia não tem "salvar" — cada arquivo entra no instante em que é enviado. Juntar as duas coisas criaria um formulário onde parte do conteúdo já foi gravado e parte não, e nenhum aviso de "alterações não salvas" daria conta disso.
+
+Decisões tomadas durante a implementação:
+
+- **Duas seções, não uma grade com etiquetas.** É o que o §225 do mapa de telas exige, e a separação é a proteção: quem envia a matrícula escolhe "documento" **antes** de escolher o arquivo. Três botões — "Adicionar fotos", "Adicionar planta", "Adicionar documento" —, e com isso o tipo nunca é uma pergunta depois do envio, nem um seletor que alguém deixa no valor errado
+- **Reordenar por botão, não arrastando.** Arrastar e soltar exigiria dependência nova e funciona mal em tela de toque, que é o aparelho do corretor. O caso real é escolher a primeira foto, e para isso "tornar capa" resolve em um toque; as setas cobrem o ajuste fino
+- **A fila é sequencial, um arquivo por vez.** Vinte envios de 5 MB em paralelo saturam o upload de quem está num 4G e fazem todos falharem juntos. Um a um, o que entrou está salvo e dá para dizer em que arquivo a fila está. Sem barra de porcentagem: `fetch` não reporta progresso de upload, e trocar o cliente HTTP por `XMLHttpRequest` só por isso não se paga
+- **A falha de um arquivo fica na tela, com o motivo, até ser dispensada.** Falha que desaparece sozinha é foto que a pessoa acha que enviou
+- **`<img>` comum, não `next/image`.** A URL de leitura é assinada e muda a cada leitura; o otimizador do Next cacheia por URL e reotimizaria a mesma foto a cada visita, gastando CPU do plano compartilhado para produzir um arquivo que ele já tinha sob outro nome
+- **A URL de leitura expira em uma hora**, e esta tela fica aberta. O `onError` da imagem recarrega a lista **uma vez**: em laço, um objeto perdido viraria uma tela consumindo a API para sempre
+- **Capa e remoção recarregam a lista; a ordem aproveita a resposta.** Definir capa tira a marca de outra mídia, e remover a capa promove a próxima — a resposta de um item não diz qual é o outro. `ordem` devolve a lista inteira, então ali não há segunda chamada
+- **O nome do arquivo é gravado como texto alternativo do documento.** A API não guarda nome de arquivo; sem isso, uma matrícula enviada é um ícone de PDF sem identificação, e quem procura abre um por um. Para foto não se preenche — `IMG_4821.jpg` lido em voz alta por leitor de tela é pior do que silêncio
+- **Largura e altura são medidas no navegador** antes do envio, como o contrato previa, para a grade reservar o espaço e não "pular" quando a foto chega
+- **Planta em PDF mostra ícone e link, não miniatura.** Um quadrado cinza pareceria imagem que não carregou
+
+**Verificação.** Tipo, lint e build. O percurso foi exercitado contra o servidor em execução, nas mesmas chamadas e na mesma ordem em que a tela as faz, com 29 conferências: a primeira foto nasce capa, a troca de capa deixa exatamente uma, documento recusa ser capa, a ordem que a galeria monta é aceita e a parcial é recusada com 400, descrição salva e vazio apaga, PDF como foto / GIF / arquivo de 6 MB recusados, remover a capa promove a próxima e a nova não é documento, o vigésimo primeiro arquivo não recebe URL assinada, a URL de leitura adulterada responde 403 — e as duas perguntas de isolamento: o corretor **vê** a mídia do imóvel do colega (`imovel:ver` é `ORG`) e **não** envia nela (`imovel:editar` é `OWN`, 403).
+
+**Continua sem teste de componente**, pela decisão de 21/10/2026. A fila de envio e o tratamento de falha parcial são a lógica mais delicada do site até agora, e quem mexer nelas não tem como saber se quebrou algo. A função `novaOrdem` — que monta a lista inteira trocando dois vizinhos do mesmo grupo — foi conferida no percurso justamente porque é a parte que o 400 do servidor pegaria tarde.
+
+**Um defeito da API do B4 apareceu ao rodar a suíte em máquina limpa e foi corrigido:** o adaptador local lia `API_PUBLIC_URL` no construtor, e a aplicação de teste sobe em porta aleatória que só se conhece depois de escutar. Toda URL assinada do teste apontava para a porta 3000, então os 17 casos que enviam o arquivo de verdade **só passavam com o `npm run dev` no ar** — suíte que depende de processo externo passa na máquina de quem escreveu e falha na do próximo. A base agora é lida a cada uso e o teste a aponta para si mesmo.
+
+Pendente deste item: só o **adaptador do R2**.
 
 ---
 

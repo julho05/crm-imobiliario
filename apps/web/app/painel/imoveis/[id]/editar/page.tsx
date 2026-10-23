@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Images, Trash2 } from 'lucide-react';
 import {
   ESTADOS_COMERCIAIS_ALCANCAVEIS,
   estadoIncompativelComAFinalidade,
@@ -178,6 +178,18 @@ export default function EditarImovel() {
             {imovel.publicadoEm ? <Badge>No ar</Badge> : null}
           </div>
         </div>
+
+        {/*
+          A mídia tem rota própria (B4), e o link aparece para quem só pode ver
+          tambem: ver as fotos do imovel da casa e oferece-lo ao cliente e
+          exatamente o que `imovel:ver` com escopo `ORG` permite.
+        */}
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/painel/imoveis/${imovel.id}/fotos`}>
+            <Images aria-hidden="true" />
+            Fotos e documentos
+          </Link>
+        </Button>
       </div>
 
       {salvo ? (

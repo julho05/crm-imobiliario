@@ -72,7 +72,7 @@ Três decisões de produto que vale não reabrir:
 
 **Um defeito do B8 apareceu ao montar o painel e foi corrigido:** `acessivel`, no recorte do cliente da agenda, comparava só a atribuição. Para `MANAGER` e acima — escopo `ORG` — a resposta dizia `false` em toda visita de cliente de outra pessoa, e a tela escondia um link que funcionaria. Errava para o lado seguro, e por isso nenhum teste de isolamento o pegou: isolamento prova o que **não** deve aparecer, e este era algo permitido que não aparecia. Agora o cálculo considera o escopo, com teste para os quatro papéis.
 
-Em 22/10/2026 entrou a **API do B4** — fotos e documentos do imóvel —, com 30 testes. São **752 testes**. As telas ainda não existem.
+Em 22/10/2026 entrou a **API do B4** — fotos e documentos do imóvel —, com 30 testes. São **752 testes**.
 
 **O arquivo não passa pela API.** Dois passos: ela autoriza, confere limite e tipo e devolve URL assinada de 10 minutos; o navegador envia direto ao armazenamento e depois registra a chave. Receber 20 fotos de 5 MB por requisição ocuparia, segurando bytes em memória, o mesmo processo que atende o corretor.
 
@@ -85,6 +85,18 @@ Três decisões a não reabrir:
 - **A remoção apaga a linha antes do objeto**: a falha deixa órfão invisível, em vez de linha apontando para arquivo inexistente, que viraria imagem quebrada no anúncio
 
 Limites: **20 arquivos por imóvel, 5 MB cada**, JPEG/PNG/WebP e PDF.
+
+Em 23/10/2026 entraram as **telas do B4** — `/painel/imoveis/[id]/fotos` —, e com elas o item fecha, menos o adaptador do R2. Continuam **752 testes**: a tela não acrescenta teste automatizado, pela decisão de 21/10/2026.
+
+**A separação entre público e interno é a tela, não o campo.** São duas seções com botões de envio próprios — "Adicionar fotos", "Adicionar planta", "Adicionar documento" —, então o tipo é escolhido **antes** do arquivo. Seletor depois do envio seria um campo que alguém deixa no valor errado, e o erro aqui é publicar a matrícula do proprietário.
+
+Três decisões a não reabrir:
+
+- **Reordenar é por botão, não arrastando.** Arrastar exigiria dependência nova e funciona mal em tela de toque. O caso real é escolher a capa, e isso é um toque
+- **A fila é sequencial.** Vinte envios de 5 MB em paralelo saturam o 4G do corretor e fazem todos falharem juntos. Sem barra de porcentagem: `fetch` não reporta progresso, e não se troca o cliente HTTP por cosmético
+- **`<img>` comum, não `next/image`.** A URL assinada muda a cada leitura, e o otimizador cacheia por URL — reotimizaria a mesma foto a cada visita, com a CPU do plano compartilhado
+
+**Um defeito da API do B4 apareceu ao rodar a suíte limpa:** o adaptador local lia `API_PUBLIC_URL` no construtor, e a aplicação de teste sobe em porta aleatória que só se conhece depois de escutar. As URLs assinadas do teste apontavam para a porta 3000, e os 17 casos que enviam arquivo de verdade **só passavam com o `npm run dev` no ar**. Corrigido: a base é lida a cada uso e o teste a aponta para si mesmo. A lição vale para o próximo adaptador — valor de ambiente lido no construtor congela o que o teste ainda não sabe.
 
 Ainda não existe catálogo público.
 
