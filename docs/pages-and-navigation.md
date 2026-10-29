@@ -105,6 +105,7 @@ Públicas, sem sessão, e **versionadas**. O aviso de privacidade guarda número
 >
 > - **`/entrar` recusa destino externo.** O parâmetro `?destino=` só aceita caminho que começa com uma barra. Sem isso, `?destino=https://site-falso/...` faria o próprio login redirecionar para fora — um redirecionamento aberto, que serve para dar aparência legítima a página de phishing.
 > - **`/termos` e `/privacidade` existem, mas sem texto.** Declaram que o documento está em elaboração. Texto jurídico improvisado criaria aparência de proteção que não existe e invalidaria o consentimento que o banco registra em `privacyNoticeVersion`. Depende do item D6.
+> - **Atualizado em 29/10/2026 (C5):** `/privacidade` ganhou um texto **provisório**, declarado como rascunho no topo da página, com os pontos que o parecer precisa decidir marcados entre colchetes. Ele não chega a visitante real: em produção, com o aviso em rascunho, a captura de lead recusa. `/termos` continua sem texto.
 >
 > Ainda **não** construído: o campo de `slug` não verifica disponibilidade enquanto a pessoa digita. Ele valida formato e recusa os reservados de `@app/shared`, e a colisão aparece como erro ao enviar. A verificação ao vivo exige um endpoint que não existe.
 
@@ -321,6 +322,8 @@ Nome, telefone e/ou e-mail, mensagem e **marcação explícita de consentimento,
 Cria `Lead` + `Inquiry`. O lead é atribuído ao corretor responsável pelo imóvel; sem responsável, vai para a fila de não atribuídos — **[DECIDIDO 19/10/2026]**.
 
 A resposta confirma o envio e **não devolve** dados do lead nem IDs internos. Exige anti-spam e rate limit por IP. Guarda a versão do aviso de privacidade e o **hash** do IP, nunca o IP.
+
+**[DECIDIDO 29/10/2026, item C5]** O formulário fica na coluna lateral do anúncio, com o contato da organização abaixo dele. Enquanto o aviso de privacidade for rascunho (`AVISO_DE_PRIVACIDADE.rascunho`), ele não aparece em produção e a API responde 503 — o anúncio volta a mostrar só o contato, como no C1. A resposta de sucesso substitui o formulário na própria página.
 
 **[DECIDIR]** Qual mecanismo anti-spam? Captcha de terceiro envolve custo e dado pessoal indo para fora; alternativas (campo-armadilha, limite por IP, prova de trabalho) são mais fracas mas não vazam nada. Não decido isso sozinho.
 

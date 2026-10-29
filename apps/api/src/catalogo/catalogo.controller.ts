@@ -1,11 +1,27 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Req,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import type { Request } from 'express';
+import {
+  capturaDeLeadLiberada,
+  capturaDeLeadSchema,
   filtrosDoCatalogoSchema,
   paginacaoSchema,
+  type EntradaDeCapturaDeLead,
   type FiltrosDoCatalogo,
   type Paginacao,
 } from '@app/shared';
 import { ZodValidationPipe } from '../validacao/zod-validation.pipe';
+import { LimiteDeTentativasService } from '../limite/limite-de-tentativas.service';
+import { LIMITES } from '../limite/regras';
 import { CatalogoService } from './catalogo.service';
 
 /**
@@ -32,7 +48,10 @@ import { CatalogoService } from './catalogo.service';
  */
 @Controller('publico/organizacoes/:slug')
 export class CatalogoController {
-  constructor(private readonly catalogo: CatalogoService) {}
+  constructor(
+    private readonly catalogo: CatalogoService,
+    private readonly limite: LimiteDeTentativasService,
+  ) {}
 
   @Get()
   organizacao(@Param('slug') slug: string) {
@@ -70,5 +89,47 @@ export class CatalogoController {
     @Param('slugDoImovel') slugDoImovel: string,
   ) {
     return this.catalogo.imovel(slug, slugDoImovel);
+  }
+
+  /**
+   * O formulário de interesse — item **C5**. A única escrita do catálogo.
+   *
+   * Duas recusas antes de qualquer trabalho, e nesta ordem:
+   *
+   * 1. **503 enquanto o aviso de privacidade for rascunho, em produção.** Ver
+   *    `AVISO_DE_PRIVACIDADE` em `@app/shared`: sem texto revisado, não há o
+   *    que a pessoa aceitar, e gravar o aceite de um rascunho seria registrar
+   *    um consentimento que não vale
+   * 2. **O limite de tentativas**, como primeira linha de toda rota pública
+   *    (A11). Contado antes de saber se o imóvel existe, para o limite valer
+   *    também para quem sonda ids
+   *
+   * A resposta não devolve id nenhum, nem do lead nem do imóvel: o visitante
+   * não tem o que fazer com eles, e cada id a mais é um identificador interno
+   * circulando fora (`permissions.md` §5).
+   */
+  @Post('interesse')
+  @HttpCode(201)
+  async registrarInteresse(
+    @Param('slug') slug: string,
+    @Body(new ZodValidationPipe(capturaDeLeadSchema))
+    dados: EntradaDeCapturaDeLead,
+    @Req() requisicao: Request,
+  ) {
+    if (!capturaDeLeadLiberada(process.env.NODE_ENV)) {
+      throw new ServiceUnavailableException({
+        mensagem:
+          'O envio de mensagens pelo site ainda nao esta disponivel. Use o contato da imobiliaria.',
+      });
+    }
+
+    await this.limite.consumir({
+      regra: LIMITES.capturaPorIp,
+      partes: [requisicao.ip],
+    });
+
+    await this.catalogo.registrarInteresse(slug, dados, requisicao.ip);
+
+    return { recebido: true };
   }
 }

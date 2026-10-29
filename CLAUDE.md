@@ -145,6 +145,16 @@ Login, recuperação, cadastro e as rotas de token respondem **429 com `Retry-Af
 
 Verificação de 360px sem ferramenta de navegador: o Edge headless tem largura mínima de janela acima de 360px e **recorta** a captura, parecendo transbordamento. Carregar a página dentro de um `<iframe>` de 360px dá a medida real.
 
+Em 29/10/2026 entrou o **C5** — captura de lead pelo anúncio —, com `POST /api/publico/organizacoes/:slug/interesse` e o formulário na coluna do anúncio. São **845 testes**, sem migration.
+
+**O aviso de privacidade está em rascunho, e isso trava o item em produção.** `AVISO_DE_PRIVACIDADE` (`packages/shared/src/aviso-de-privacidade.ts`) guarda a versão que a API grava no lead e o site mostra em `/privacidade`; com `rascunho: true` e `NODE_ENV=production`, a rota responde **503** e o formulário não aparece. O texto de `/privacidade` é uma proposta para o parecer (D6), com as pendências entre colchetes. Liberar exige o texto revisado **e** uma versão nova — nunca editar o texto mantendo a versão.
+
+Três decisões a não reabrir:
+
+- **A captura mora no `CatalogoService`**, para usar o mesmo `visivel()` da vitrine — recorte duplicado foi o que vazou no B7
+- **Responsável suspenso manda o lead para a fila**, não para ele
+- **Versão do aviso, hora e hash do IP vêm do servidor**; o schema descarta o resto do corpo, e há teste que envia tudo inventado
+
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 
 ### Decisões já tomadas — não reabrir sem motivo
@@ -285,6 +295,7 @@ Armadilhas confirmadas na prática:
 - **`as const` num `select` do Prisma 7 quebra a inferência de relação aninhada.** O objeto fica `readonly` e o tipo do resultado perde a relação incluída — no caso, o `ownerMember` desaparecia do retorno. O erro aparece longe da causa, na função que consome o registro, reclamando de propriedade que falta. Usar `satisfies Prisma.<Modelo>Select`, que preserva os tipos literais sem tornar o objeto somente-leitura.
 - O `apps/api/test/` estava **fora** do `tsconfig.json` (que inclui só `src/**/*`), então `tsc --noEmit` nunca o verificava. Pior: o transformador do Vitest procura o `tsconfig.json` mais próximo do arquivo para saber de `experimentalDecorators`, e sem nenhum ali um controller de teste com `@Req()` falhava com "Decorators are not valid here" — erro que aparece como falha de suite, não de configuração. Resolvido com `apps/api/test/tsconfig.json`, que **precisa** ter esse nome exato, e que declara `module: esnext` porque quem carrega esses arquivos é o Vitest, como ESM, e não o `tsc` para CommonJS.
 - **`prisma migrate dev` trava sem saída quando roda sem terminal interativo** (caso do assistente, em 29/10/2026), e interromper o shell **não** mata o processo do Node: ele continuou vivo, criou uma pasta de migration duplicada e a deixou para o `deploy` seguinte aplicar duas vezes. Fora de terminal interativo, gerar com `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script -o <pasta>/migration.sql` e aplicar com `prisma migrate deploy`. Conferir depois com `migrate status` e o `db:drift`.
+- **`LEAD` é palavra reservada no MySQL 8.** Consulta manual à tabela precisa de crase: ``FROM `Lead` ``. O erro é um 1064 genérico "near 'Lead l JOIN...'", que não diz que a palavra é o problema. O Prisma já cita os nomes, então isso só aparece em SQL escrito à mão.
 - **O CI falhou em todas as execuções de 20/10 a 29/10/2026, e ninguém viu.** Os testes recusam rodar sem `TEST_DATABASE_URL`, a API recusa subir sem `IP_HASH_SECRET` e `MIDIA_SIGN_SECRET`, e o workflow só definia `DATABASE_URL`. Na máquina de desenvolvimento tudo vinha do `.env`, fora do Git. Corrigido no `ci.yml`, com segredos gerados só para o CI e o banco `crm_test` criado no job; reproduzido antes e depois num clone limpo, sem `.env`. Duas lições: **variável nova obrigatória entra no `.env.example` e no `ci.yml` no mesmo commit**; e "passa na minha máquina" não prova nada enquanto ninguém olha a aba Actions depois do push.
 
 ## Situação das dez entregas do briefing inicial

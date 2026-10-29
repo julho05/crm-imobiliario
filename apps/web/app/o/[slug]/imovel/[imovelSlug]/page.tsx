@@ -1,12 +1,17 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Check, MapPin } from 'lucide-react';
-import { ROTULOS_DE_FINALIDADE, ROTULOS_DE_TIPO_DE_IMOVEL } from '@app/shared';
+import {
+  capturaDeLeadLiberada,
+  ROTULOS_DE_FINALIDADE,
+  ROTULOS_DE_TIPO_DE_IMOVEL,
+} from '@app/shared';
 import {
   CabecalhoDaOrganizacao,
   ContatoDaOrganizacao,
 } from '@/components/catalogo/cabecalho-da-organizacao';
 import { EtiquetaDeReserva } from '@/components/catalogo/etiqueta-de-reserva';
+import { FormularioDeInteresse } from '@/components/catalogo/formulario-de-interesse';
 import { GaleriaPublica } from '@/components/catalogo/galeria-publica';
 import {
   buscarAnuncio,
@@ -27,12 +32,12 @@ import { formatarArea, formatarDinheiro } from '@/lib/imoveis';
  * sai no catálogo — e não precisa: com `null`, o bloco simplesmente não
  * existe, e o bairro e a cidade já estão no topo.
  *
- * ## O formulário de interesse ainda não está aqui
+ * ## O formulário de interesse aparece só onde envia
  *
- * É o item C5, que depende do aviso de privacidade e do anti-spam. Até lá, o
- * lado do anúncio mostra o contato da organização. Desenhar um formulário que
- * não envia nada seria pior do que não ter: o visitante preencheria e
- * esperaria resposta.
+ * Item C5. Enquanto o aviso de privacidade for rascunho, o formulário não
+ * existe em produção — a API recusaria com 503, e formulário que não envia é
+ * pior do que nenhum: o visitante preencheria e esperaria resposta. Nesse caso
+ * o lado do anúncio volta a ser o do C1, só com o contato da organização.
  */
 
 type Props = {
@@ -56,6 +61,9 @@ export default async function Anuncio({ params }: Props) {
   const { organizacao, imovel } = await buscarAnuncio(slug, imovelSlug);
 
   const temContato = Boolean(organizacao.telefone || organizacao.email);
+  // Lido no servidor, a cada requisição: é o mesmo critério com que a API
+  // responde 503, então o formulário nunca aparece onde o envio seria recusado.
+  const formularioLiberado = capturaDeLeadLiberada(process.env.NODE_ENV);
 
   return (
     <>
@@ -145,15 +153,45 @@ export default async function Anuncio({ params }: Props) {
             )}
           </article>
 
-          {temContato && (
+          {(formularioLiberado || temContato) && (
             <aside className="lg:sticky lg:top-6 lg:self-start">
               <div className="bg-card rounded-lg border p-4">
                 <h2 className="mb-1 font-semibold">Gostou deste imóvel?</h2>
-                <p className="text-muted-foreground mb-3 text-sm">
-                  Fale com {organizacao.nome} e informe o código{' '}
-                  <strong className="text-foreground">{imovel.codigo}</strong>.
-                </p>
-                <ContatoDaOrganizacao organizacao={organizacao} />
+                {formularioLiberado ? (
+                  <>
+                    <p className="text-muted-foreground mb-3 text-sm">
+                      Envie uma mensagem para {organizacao.nome}.
+                    </p>
+                    <FormularioDeInteresse
+                      slug={organizacao.slug}
+                      imovelId={imovel.id}
+                      codigo={imovel.codigo}
+                      nomeDaOrganizacao={organizacao.nome}
+                    />
+                  </>
+                ) : (
+                  <p className="text-muted-foreground mb-3 text-sm">
+                    Fale com {organizacao.nome} e informe o código{' '}
+                    <strong className="text-foreground">{imovel.codigo}</strong>
+                    .
+                  </p>
+                )}
+                {temContato && (
+                  <div
+                    className={formularioLiberado ? 'mt-4 border-t pt-4' : ''}
+                  >
+                    {formularioLiberado && (
+                      <p className="text-muted-foreground mb-2 text-sm">
+                        Ou fale direto, informando o código{' '}
+                        <strong className="text-foreground">
+                          {imovel.codigo}
+                        </strong>
+                        :
+                      </p>
+                    )}
+                    <ContatoDaOrganizacao organizacao={organizacao} />
+                  </div>
+                )}
               </div>
             </aside>
           )}

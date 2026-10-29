@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
+  AVISO_DE_PRIVACIDADE,
   MIDIA_PUBLICA,
   PropertyPurpose,
   STATUS_VISIVEIS_NO_CATALOGO,
+  type EntradaDeCapturaDeLead,
   type FiltrosDoCatalogo,
   type Paginacao,
 } from '@app/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { hashDeIp } from '../comum/hash-de-ip';
 import { ArmazenamentoDeMidia } from '../midia/armazenamento-de-midia';
 import type { Prisma } from '../generated/prisma/client';
 import {
@@ -22,7 +25,8 @@ import {
  * ## Um recorte, em um lugar só
  *
  * `visivel()` devolve a cláusula que define o que o visitante alcança, e as
- * três consultas deste arquivo a usam. Não há segunda versão dela em lugar
+ * quatro consultas deste arquivo a usam — a do formulário de interesse (C5)
+ * inclusive. Não há segunda versão dela em lugar
  * nenhum, e isso não é elegância: no item B7 a listagem e a consulta por id
  * tinham recortes separados, a segunda esqueceu um filtro, e o nome de um
  * cliente excluído continuou saindo por aquela porta. Ali era o CRM, onde quem
@@ -176,6 +180,110 @@ export class CatalogoService {
       ),
       imovel: paraImovelPublico(registro, await this.comUrl(registro.media)),
     };
+  }
+
+  /**
+   * O formulário de interesse — item **C5**.
+   *
+   * Mora aqui, e não no módulo de leads, por causa do `visivel()`: o imóvel
+   * sobre o qual o visitante pergunta tem de ser um que ele alcança, e esta é
+   * a única definição disso. Um serviço à parte precisaria de uma segunda, e
+   * foi recorte duplicado que vazou nome de cliente excluído no B7. Daí os
+   * quatro casos — rascunho, de outra organização, excluído, organização
+   * suspensa — darem o mesmo 404 da vitrine.
+   *
+   * ## Para quem o lead vai
+   *
+   * Para o responsável pelo imóvel, **se o vínculo dele estiver ativo**. Sem
+   * responsável, ou com ele suspenso, vai para a fila (`assignedMemberId`
+   * nulo). Entregar a quem foi suspenso esconderia o contato: ele não entra
+   * mais no sistema, e o lead nunca apareceria na fila para ninguém o pegar.
+   *
+   * ## Um lead novo por envio
+   *
+   * Mesmo com telefone repetido. `data-model.md` §3.4 proíbe fusão automática,
+   * e a tela do CRM já sinaliza a duplicata a quem atende.
+   *
+   * ## O que vem do servidor, e não do formulário
+   *
+   * A versão do aviso, a hora do consentimento e o hash do IP. Os três são a
+   * prova do aceite, e prova que o cliente pudesse escrever não provaria nada.
+   * O schema descarta qualquer outra chave do corpo.
+   */
+  async registrarInteresse(
+    slug: string,
+    dados: EntradaDeCapturaDeLead,
+    ip: string | undefined,
+  ): Promise<void> {
+    const organizacao = await this.carregarOrganizacao(slug);
+
+    const imovel = await this.prisma.property.findFirst({
+      where: { ...this.visivel(organizacao.id), id: dados.propertyId },
+      select: {
+        id: true,
+        slug: true,
+        ownerMemberId: true,
+        ownerMember: { select: { status: true } },
+      },
+    });
+
+    if (!imovel) {
+      throw new NotFoundException({ mensagem: 'Imovel nao encontrado.' });
+    }
+
+    const responsavel =
+      imovel.ownerMember?.status === 'ACTIVE' ? imovel.ownerMemberId : null;
+    const ipHash = hashDeIp(ip);
+
+    await this.prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.create({
+        data: {
+          organizationId: organizacao.id,
+          fullName: dados.nomeCompleto,
+          phone: dados.telefone,
+          email: dados.email,
+          source: 'PUBLIC_CATALOG',
+          assignedMemberId: responsavel,
+          consentGivenAt: new Date(),
+          privacyNoticeVersion: AVISO_DE_PRIVACIDADE.versao,
+          consentIpHash: ipHash,
+        },
+        select: { id: true },
+      });
+
+      await tx.inquiry.create({
+        data: {
+          organizationId: organizacao.id,
+          propertyId: imovel.id,
+          leadId: lead.id,
+          message: dados.mensagem || null,
+          // Montada aqui, e não lida do `Referer`: o cabeçalho é do cliente, e
+          // o caminho do anúncio é tudo o que esta coluna precisa dizer.
+          sourceUrl: `/o/${slug}/imovel/${imovel.slug}`,
+        },
+      });
+
+      // Escrita direto na tabela, sem o `AutorizacaoService.registrar`: aqui
+      // não há `Membership` que tenha agido — quem agiu foi um visitante sem
+      // conta, e `actorMembershipId` nulo é exatamente isso. Os dados pessoais
+      // não entram no `metadata`, pela mesma razão do `lead.editado`.
+      await tx.activity.create({
+        data: {
+          organizationId: organizacao.id,
+          actorMembershipId: null,
+          entityType: 'Lead',
+          entityId: lead.id,
+          action: 'lead.capturado',
+          metadata: {
+            origem: 'PUBLIC_CATALOG',
+            imovelId: imovel.id,
+            foiParaAFila: responsavel === null,
+            versaoDoAviso: AVISO_DE_PRIVACIDADE.versao,
+          },
+          ipHash,
+        },
+      });
+    });
   }
 
   /**

@@ -23,6 +23,7 @@ export * from './enums';
 export * from './permissoes';
 export * from './rotulos';
 export * from './primitivos';
+export * from './aviso-de-privacidade';
 export * from './schemas/autenticacao';
 export * from './schemas/captura-de-lead';
 export * from './schemas/catalogo';

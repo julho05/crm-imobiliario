@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { hash } from '@node-rs/argon2';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import {
+  AVISO_DE_PRIVACIDADE,
   ETAPAS_PADRAO_DO_FUNIL,
   paraSlug,
   type LeadSource,
@@ -1396,7 +1397,9 @@ async function criarOrganizacao(
         ...(lead.consentiu
           ? {
               consentGivenAt: new Date(),
-              privacyNoticeVersion: '2026-10-01',
+              // A versao que existe. Ate o C5 era uma data inventada, que nao
+              // correspondia a texto nenhum.
+              privacyNoticeVersion: AVISO_DE_PRIVACIDADE.versao,
               // Hash, nunca o IP. O valor e inventado e tem o formato certo.
               consentIpHash: 'seed-sem-ip-real',
             }

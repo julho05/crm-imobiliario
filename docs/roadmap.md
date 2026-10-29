@@ -353,7 +353,7 @@ Depende de: B1 a B4 · mecanismo anti-spam decidido · texto do aviso de privaci
 | C2 | DTO público — *concluído em 23/10/2026* | Construído campo a campo; **teste que falha se um campo novo do `Property` vazar** na resposta pública | B3 |
 | C3 | Redirecionamento de slug | Slug antigo responde 301 para o novo; adotar slug que ainda redireciona é recusado | A2 |
 | C4 | Busca e filtros — *concluído em 29/10/2026* | Filtros de `filtrosDoCatalogoSchema`; teste confirma que **não** há filtro por rua, CEP ou coordenada | C2 |
-| C5 | Captura de lead | Consentimento explícito obrigatório; grava versão do aviso e **hash** do IP; resposta não devolve IDs internos; lead vai ao responsável do imóvel ou à fila | B5, C1 |
+| C5 | Captura de lead — *concluído em 29/10/2026, com o aviso em rascunho e travado em produção* | Consentimento explícito obrigatório; grava versão do aviso e **hash** do IP; resposta não devolve IDs internos; lead vai ao responsável do imóvel ou à fila | B5, C1 |
 | C6 | Anti-spam | Limite por IP comprovado em teste; mecanismo escolhido registrado em `docs/` | C5 |
 | C7 | SEO e responsividade | Título, descrição e dados estruturados por imóvel; páginas utilizáveis em tela de 360px | C1 |
 
@@ -419,6 +419,27 @@ Decisões tomadas durante a implementação:
 Verificado contra o servidor em execução: contagem por finalidade e por termo, formulário enviado em branco, erro de preço sem finalidade com a lista inteira, paginação de uma busca de 15 resultados levando o termo na página 2, e as duas larguras.
 
 **Fica para quando houver motivo:** busca textual (FULLTEXT). O `LIKE '%termo%'` não usa índice, e basta enquanto a busca roda dentro de uma organização só.
+
+### Captura de lead — **C5 concluído em 29/10/2026**
+
+`POST /api/publico/organizacoes/:slug/interesse` e o formulário no anúncio. São **21 testes novos** em `test/catalogo/captura-de-lead.http.spec.ts`, e nenhuma migration: as colunas de consentimento e a tabela `Inquiry` existiam desde a fundação.
+
+**A dependência do aviso de privacidade foi resolvida com uma trava, não com um texto.** O roadmap exigia o texto do aviso, e `pages-and-navigation.md` §4 proíbe texto jurídico improvisado. Decidido em 29/10/2026: o aviso existe com texto provisório e `rascunho: true` em `packages/shared/src/aviso-de-privacidade.ts`, e **em produção a rota responde 503 e o anúncio não mostra o formulário** enquanto for assim. Liberar exige o parecer (D6), trocar o texto de `/privacidade` e mudar a versão — as três coisas juntas.
+
+Decisões tomadas durante a implementação:
+
+- **A captura mora no `CatalogoService`**, ao lado do `visivel()`, e não no módulo de leads: o imóvel tem de ser um que o visitante alcança, e esta é a única definição disso. Rascunho, vendido, excluído, de outra organização e organização suspensa dão o mesmo 404. Verificado por mutação: trocar o recorte por um filtro só de organização quebra três casos
+- **O lead vai ao responsável do imóvel se o vínculo dele estiver ativo**; sem responsável ou com ele suspenso, à fila. Entregar a quem foi suspenso esconderia o contato de todo mundo
+- **Versão do aviso, hora do aceite e hash do IP vêm do servidor.** Teste envia os três inventados, mais responsável e origem, e confere que nada disso chega ao banco
+- **Um lead novo por envio**, mesmo com telefone repetido — `data-model.md` §3.4 proíbe fusão automática, e a tela já sinaliza a duplicata
+- **Auditoria `lead.capturado` com `actorMembershipId` nulo**: quem agiu foi um visitante sem conta. Sem dado pessoal no `metadata`
+- **Limite de 5 envios por hora por IP** (`LIMITES.capturaPorIp`). O mecanismo anti-spam do C6 soma-se a ele
+- **O formulário é o único `'use client'` do catálogo.** A caixa de consentimento nasce desmarcada e o link do aviso abre em outra aba, para quem o lê no meio do preenchimento não perder o que escreveu
+- O seed passou a gravar a versão real do aviso nos leads da vitrine, em vez de uma data que não correspondia a texto nenhum
+
+Verificado contra o servidor em execução, pelo proxy do site: o anúncio mostra o formulário com a caixa desmarcada, nas duas larguras; o envio cria o lead para o Tiago, com a versão do aviso, hash de 64 caracteres, a origem `/o/aurora/imovel/...` e uma linha de auditoria; o Tiago o vê com o consentimento, a Bianca não; sem consentimento responde 400, e o imóvel da Aurora enviado pela vitrine da Meridiano, 404.
+
+**Pendente:** o texto final do aviso (D6). A seção "Para quem tem conta no sistema" de `/privacidade` também está por redigir — o cadastro linka para a mesma página.
 
 ---
 

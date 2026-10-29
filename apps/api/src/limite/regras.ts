@@ -76,4 +76,15 @@ export const LIMITES = {
     maximo: 30,
     janelaEmSegundos: QUINZE_MINUTOS,
   },
+  /**
+   * Formulario de interesse do catalogo (C5). Baixo de proposito: cada envio
+   * vira um lead na tela de um corretor, e quem procura imovel de verdade
+   * pergunta sobre poucos por hora. O mecanismo anti-spam que vier com o C6
+   * soma-se a este, nao o substitui.
+   */
+  capturaPorIp: {
+    nome: 'captura:ip',
+    maximo: 5,
+    janelaEmSegundos: UMA_HORA,
+  },
 } as const satisfies Record<string, Regra>;

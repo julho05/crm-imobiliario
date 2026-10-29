@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MidiaModule } from '../midia/midia.module';
+import { LimiteModule } from '../limite/limite.module';
 import { CatalogoController } from './catalogo.controller';
 import { CatalogoService } from './catalogo.service';
 
@@ -16,9 +17,12 @@ import { CatalogoService } from './catalogo.service';
  * Importa o `MidiaModule` apenas pela porta `ArmazenamentoDeMidia`, para
  * transformar `objectKey` em URL. Não usa o `MidiaService`, que exige contexto
  * autorizado e não tem o que fazer aqui.
+ *
+ * Importa o `LimiteModule` desde o C5: o formulário de interesse é a única
+ * escrita do catálogo, e como toda rota pública que escreve, é limitado.
  */
 @Module({
-  imports: [MidiaModule],
+  imports: [MidiaModule, LimiteModule],
   controllers: [CatalogoController],
   providers: [CatalogoService],
 })
