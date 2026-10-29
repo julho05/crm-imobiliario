@@ -79,6 +79,14 @@ A unicidade de `slug` é verificada contra **as duas tabelas**: ninguém pode ad
 
 **[PROPOSTA]** Prazo de retenção: indefinido no MVP. Liberar um slug depois exige decisão explícita do `OWNER`, com aviso de que os links antigos param de funcionar.
 
+**[DECIDIDO 29/10/2026, item C3]** Como a troca funciona:
+
+- O slug antigo responde **308**, não 301 — os dois são permanentes para o robô de busca, e o Next só emite 308 de dentro da página
+- **Três trocas a cada 30 dias por organização**: cada troca reserva o antigo para sempre, e sem teto uma organização ocuparia nomes em sequência. Só conta a troca que acontece
+- **Voltar a um slug antigo da própria organização é permitido** e apaga aquela linha do histórico. O de outra organização é recusado
+- **Organização suspensa não redireciona**: o slug antigo responde o mesmo 404 do inexistente
+- Cada linha aponta para a organização, não para o slug seguinte, então A→B→C leva `A` direto a `C`
+
 **`Membership`** — o vínculo. É aqui que mora o papel.
 
 ```

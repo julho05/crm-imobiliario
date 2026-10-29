@@ -41,7 +41,12 @@ export default function Privacidade() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Aviso de privacidade</CardTitle>
+        {/* `h1` dentro do título: o `CardTitle` é uma `div`, e esta é página
+            pública, que o robô de busca e o leitor de tela leem pelo título
+            (C7). */}
+        <CardTitle>
+          <h1>Aviso de privacidade</h1>
+        </CardTitle>
         <CardDescription>Versão {AVISO_DE_PRIVACIDADE.versao}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5 text-sm leading-relaxed">

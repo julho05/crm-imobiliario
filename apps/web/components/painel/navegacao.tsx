@@ -7,6 +7,7 @@ import {
   CalendarDays,
   LayoutDashboard,
   ListChecks,
+  Store,
   TrendingUp,
   Users,
 } from 'lucide-react';
@@ -29,8 +30,8 @@ import { cn } from '@/lib/utils';
  *
  * ## So o que existe
  *
- * Esta lista tem seis itens porque sao as seis secoes construidas. Equipe,
- * organizacao, auditoria e perfil entram **quando existirem**:
+ * Esta lista tem sete itens porque sao as sete secoes construidas. Equipe,
+ * auditoria e perfil entram **quando existirem**:
  * menu que leva a tela vazia ou a 404 e pior do que menu curto, porque ensina a
  * pessoa a nao confiar na navegacao.
  *
@@ -85,6 +86,14 @@ const ITENS: ItemDeMenu[] = [
     href: '/painel/tarefas',
     icone: ListChecks,
     acao: 'negociacao:ver',
+  },
+  {
+    // Por `editarSlug`, e não `ver`: hoje a tela só serve para trocar o
+    // endereço, e oferecê-la ao corretor seria levá-lo a uma tela sem ação.
+    rotulo: 'Organizacao',
+    href: '/painel/organizacao',
+    icone: Store,
+    acao: 'organizacao:editarSlug',
   },
 ];
 

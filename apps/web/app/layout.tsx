@@ -1,10 +1,14 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ProvedorDeTema } from '@/components/provedor-de-tema';
+import { origemDoSite } from '@/lib/seo';
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME ?? 'CRM';
 
 export const metadata: Metadata = {
+  // Base dos endereços relativos de canônico e Open Graph (item C7). A prévia
+  // do WhatsApp e o Google exigem URL absoluta.
+  metadataBase: new URL(origemDoSite()),
   title: appName,
   description: 'CRM imobiliario com catalogo publico',
 };

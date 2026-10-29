@@ -161,6 +161,20 @@ Em 29/10/2026, no mesmo dia, entrou o **C6** — anti-spam do formulário —, c
 
 **Defeito do C5 encontrado no navegador, e corrigido:** antes de o React assumir a página, clicar em "Enviar" mandava o formulário pelo jeito nativo — **GET, com nome e telefone na URL**. Agora o botão nasce desabilitado e o `<form>` declara `method="post"`. Nenhum teste da API pegaria isso: a requisição nunca chegava a ela. **Formulário com dado pessoal precisa ser exercitado num navegador de verdade**, não só por `curl`.
 
+Em 29/10/2026 entraram o **C3** — redirecionamento de endereço — e o **C7** — SEO e 360px —, e com eles **todos os itens da Fase 3 estão construídos**. O que falta para ela valer em produção é o texto do aviso (D6) e o domínio público do R2. São **890 testes**, sem migration: a tabela `OrganizationSlugHistory` existia desde a fundação.
+
+**O C3 precisou de um jeito de trocar o endereço**, que não existia: `PATCH /organizacao/endereco` (só `OWNER` e `ADMIN`) e `/painel/organizacao`, **só com o endereço** — o resto da tela fica para um item próprio. O catálogo responde **308** ao slug antigo, e o site repassa com `permanentRedirect`, mantendo caminho e filtros. Decisões do responsável: **308 e não 301** (o Next só emite 308 de dentro da página); **três trocas a cada 30 dias**, contando só a troca que acontece, porque cada uma reserva o endereço antigo para sempre. Organização suspensa não redireciona — o slug antigo dá o mesmo 404 do inexistente.
+
+**O C7 mora em `apps/web/lib/seo.ts`**, funções puras com o primeiro teste do `apps/web` (sem DOM, sem dependência nova). Três decisões a não reabrir:
+
+- **A rua não vai para o índice, nem quando a página a mostra** — o que o Google guarda sai do controle do corretor. A descrição é montada dos campos, nunca do texto livre
+- **O JSON-LD passa por `serializarJsonLd`**, que escapa `<`: título é texto do corretor, e `</script>` nele abriria script de terceiro na vitrine
+- **Sem sitemap** (decisão do responsável): o global listaria a carteira de clientes da plataforma
+
+Busca filtrada responde `noindex, follow`, e `metadataBase` vem de `WEB_ORIGIN` — que agora precisa do domínio real em produção, senão a prévia do link aponta para `localhost`.
+
+Verificação de 360px **sem iframe**: `Emulation.setDeviceMetricsOverride` pelo CDP fixa a largura em 360 sem o recorte da janela mínima do Edge, e permite medir `scrollWidth` em vez de olhar captura.
+
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 
 ### Decisões já tomadas — não reabrir sem motivo

@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { hashDeIp } from '../comum/hash-de-ip';
 import { ArmazenamentoDeMidia } from '../midia/armazenamento-de-midia';
 import type { Prisma } from '../generated/prisma/client';
+import { EnderecoMovido } from './endereco-movido';
 import {
   paraImovelPublico,
   paraOrganizacaoPublica,
@@ -308,6 +309,14 @@ export class CatalogoService {
    *
    * Lança 404 para slug inexistente **e** para organização suspensa, com a
    * mesma mensagem. Distinguir os dois diria a quem sonda quais contas existem.
+   *
+   * ## Slug antigo redireciona (C3)
+   *
+   * Só depois de o slug não ser o atual de ninguém, e só para organização
+   * **ativa**: redirecionar o endereço antigo de uma conta suspensa confirmaria
+   * que ela existe, que é o que o 404 igual para os dois casos esconde. Trocas
+   * em sequência (A→B→C) levam direto ao atual, porque toda linha do histórico
+   * aponta para a organização, e não para o slug seguinte.
    */
   private async carregarOrganizacao(slug: string) {
     const organizacao = await this.prisma.organization.findFirst({
@@ -328,6 +337,15 @@ export class CatalogoService {
     });
 
     if (!organizacao) {
+      const antigo = await this.prisma.organizationSlugHistory.findUnique({
+        where: { slug },
+        select: { organization: { select: { slug: true, status: true } } },
+      });
+
+      if (antigo?.organization.status === 'ACTIVE') {
+        throw new EnderecoMovido(antigo.organization.slug);
+      }
+
       throw new NotFoundException({ mensagem: 'Pagina nao encontrada.' });
     }
 

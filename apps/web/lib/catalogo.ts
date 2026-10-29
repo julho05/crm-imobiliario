@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import {
   filtrosDoCatalogoSchema,
   type FiltrosDoCatalogo,
@@ -115,6 +115,13 @@ export function buscarVitrine(
 
   return lerDaApi(
     `/publico/organizacoes/${encodeURIComponent(slug)}/imoveis?${consulta}`,
+    (slugAtual) => {
+      // A busca segue junto; a página 1 fica sem `?pagina=`, como na paginação.
+      const destino = consultaDosFiltros(filtros);
+      if (pagina > 1) destino.set('pagina', String(pagina));
+      const texto = destino.toString();
+      return texto ? `/o/${slugAtual}?${texto}` : `/o/${slugAtual}`;
+    },
   );
 }
 
@@ -126,6 +133,7 @@ export function buscarAnuncio(
     `/publico/organizacoes/${encodeURIComponent(
       slug,
     )}/imoveis/${encodeURIComponent(slugDoImovel)}`,
+    (slugAtual) => `/o/${slugAtual}/imovel/${encodeURIComponent(slugDoImovel)}`,
   );
 }
 
@@ -152,17 +160,38 @@ export function buscarAnuncio(
  * do ar, com a mesma mensagem — e a página repassa isso sem distinguir, como
  * status HTTP 404 de verdade. Qualquer outra falha cai no `error.tsx`, que não
  * mostra a mensagem técnica.
+ *
+ * ## 308 vira redirecionamento da página (C3)
+ *
+ * A vitrine trocou de endereço. A API responde 308 com o slug atual no corpo, e
+ * o `fetch` **não** segue sozinho (`redirect: 'manual'`): seguir mostraria a
+ * vitrine nova debaixo do endereço velho, e o Google continuaria indexando o
+ * velho. Quem monta o endereço da **página** é `destino`, porque o `Location`
+ * da API aponta para a API.
+ *
+ * `permanentRedirect` responde 308, e não 301 — decisão de 29/10/2026: os dois
+ * são permanentes para o robô de busca, e o 301 exigiria um interceptador
+ * consultando a API em toda visita.
  */
-async function lerDaApi<T>(caminho: string): Promise<T> {
+async function lerDaApi<T>(
+  caminho: string,
+  destino: (slugAtual: string) => string,
+): Promise<T> {
   const base = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:3333';
 
   const resposta = await fetch(`${base}/api${caminho}`, {
     cache: 'no-store',
+    redirect: 'manual',
     headers: { accept: 'application/json' },
   });
 
   if (resposta.status === 404) {
     notFound();
+  }
+
+  if (resposta.status === 308) {
+    const { slugAtual } = (await resposta.json()) as { slugAtual: string };
+    permanentRedirect(destino(slugAtual));
   }
 
   if (!resposta.ok) {

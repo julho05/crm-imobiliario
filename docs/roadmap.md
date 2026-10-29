@@ -347,15 +347,17 @@ Ficou invisível por um dia porque **teste de isolamento testa o que não deve a
 
 Depende de: B1 a B4 · ~~mecanismo anti-spam decidido~~ (C6, 29/10/2026) · texto do aviso de privacidade (o C5 está pronto, mas travado em produção até ele).
 
+**Todos os itens da Fase 3 estão construídos desde 29/10/2026.** O que falta para ela valer em produção não é código: o texto revisado do aviso de privacidade (D6), que destrava o formulário do C5, e o domínio público do R2, que dá às fotos uma URL que não expira.
+
 | # | Tarefa | Critério de aceitação verificável | Depende de |
 |---|---|---|---|
 | C1 | Vitrine `/o/[slug]` — *concluído em 29/10/2026* | Mostra só `AVAILABLE` e `RESERVED`, este com etiqueta; teste confirma que `DRAFT`, `SOLD`, `RENTED`, `INACTIVE` e excluído **não** aparecem | B2 |
 | C2 | DTO público — *concluído em 23/10/2026* | Construído campo a campo; **teste que falha se um campo novo do `Property` vazar** na resposta pública | B3 |
-| C3 | Redirecionamento de slug | Slug antigo responde 301 para o novo; adotar slug que ainda redireciona é recusado | A2 |
+| C3 | Redirecionamento de slug — *concluído em 29/10/2026* | Slug antigo responde redirecionamento permanente (**308**, decisão de 29/10/2026) para o novo; adotar slug que ainda redireciona é recusado | A2 |
 | C4 | Busca e filtros — *concluído em 29/10/2026* | Filtros de `filtrosDoCatalogoSchema`; teste confirma que **não** há filtro por rua, CEP ou coordenada | C2 |
 | C5 | Captura de lead — *concluído em 29/10/2026, com o aviso em rascunho e travado em produção* | Consentimento explícito obrigatório; grava versão do aviso e **hash** do IP; resposta não devolve IDs internos; lead vai ao responsável do imóvel ou à fila | B5, C1 |
 | C6 | Anti-spam — *concluído em 29/10/2026* | Limite por IP comprovado em teste; mecanismo escolhido registrado em `docs/` | C5 |
-| C7 | SEO e responsividade | Título, descrição e dados estruturados por imóvel; páginas utilizáveis em tela de 360px | C1 |
+| C7 | SEO e responsividade — *concluído em 29/10/2026* | Título, descrição e dados estruturados por imóvel; páginas utilizáveis em tela de 360px | C1 |
 
 ### API pública — **C2 concluído em 23/10/2026, e com ele o B3**
 
@@ -457,6 +459,48 @@ Decisões tomadas durante a implementação:
 **Um defeito do C5 apareceu na verificação pelo navegador, e foi corrigido.** Até o React assumir a página, um clique em "Enviar" fazia o navegador enviar o formulário sozinho, por GET: nome e telefone iam para a URL — histórico, log do servidor, `Referer`. No 4G do visitante a janela dura segundos. Nenhum teste da API pegaria isso, porque a API nunca recebe a requisição. Agora o botão nasce desabilitado e só habilita com a ficha em mãos, e o formulário declara `method="post"`. Verificado com a página sem JavaScript: o clique não faz nada e a URL fica limpa.
 
 Verificado no navegador, com JavaScript: a pessoa que espera envia; o robô que preenche a armadilha vê a mesma confirmação e não vira lead; o clique imediato não faz nada, e o seguinte passa.
+
+### Redirecionamento de endereço — **C3 concluído em 29/10/2026**
+
+A tabela `OrganizationSlugHistory` existia desde a fundação, e o cadastro já recusava slug que redireciona. Faltava **como trocar o endereço**: não havia rota nem tela. O item trouxe as duas, mais o redirecionamento. São **21 testes** em `test/organizacao/endereco.http.spec.ts`, sem migration.
+
+- **`PATCH /organizacao/endereco`**, só `OWNER` e `ADMIN` (`organizacao:editarSlug`), sempre sobre a organização ativa da sessão — o corpo não leva id. Numa transação: o slug antigo entra no histórico, o novo entra na organização, e a auditoria registra `organizacao.enderecoTrocado`
+- **O catálogo responde 308** ao slug antigo, com o slug atual no corpo e no `Location`, que troca só o segmento do slug e mantém caminho e consulta. O site lê o corpo e chama `permanentRedirect` para `/o/novo/...`, filtros e página inclusive
+- **`/painel/organizacao`** só com a seção "Endereço da vitrine", e o item de menu só para quem pode trocar
+
+Decisões do responsável, em 29/10/2026:
+
+- **308, e não 301.** O Next só emite redirecionamento permanente como 308 de dentro da página; o 301 exigiria um interceptador consultando a API em toda visita. O robô de busca trata os dois igual. Do lado da API, o 308 preserva o método: o envio de interesse de uma página aberta antes da troca continua sendo `POST`
+- **Três trocas a cada 30 dias, por organização**, pelo mecanismo do A11. Cada troca reserva o endereço antigo para sempre, e sem teto uma organização ocuparia nomes trocando em sequência. **Só conta a troca que vai acontecer** — exceção à regra do A11 —, para quem tentou três nomes ocupados não ficar um mês trancado
+- **A tela tem só o endereço.** Nome, contato público, apresentação e logo ficam para um item próprio
+
+Decisões tomadas durante a implementação:
+
+- **Organização suspensa: o endereço antigo responde 404, igual ao inexistente**, corpo inclusive. Redirecionar confirmaria que a conta existe
+- **Voltar a um endereço antigo da própria organização é permitido** e tira aquela linha do histórico — um slug não pode ser atual e antigo ao mesmo tempo. O de outra organização é recusado com 409, que é o critério do item
+- **Trocas em sequência levam direto ao atual** (A→B→C: `A` vai a `C`), porque cada linha do histórico aponta para a organização, e não para o slug seguinte
+- **A troca pede confirmação na tela**, com a consequência escrita antes do botão: links antigos continuam funcionando, o endereço fica reservado, três trocas por mês
+
+Verificado por mutação: aceitar slug que redireciona para outra organização quebra um caso; redirecionar o endereço de organização suspensa quebra outro. Contra o servidor, com a Meridiano do seed: a vitrine antiga com `?tipo=APARTMENT&pagina=2` respondeu 308 para o endereço novo com a mesma consulta, o anúncio antigo para o anúncio novo, e a volta ao endereço original deixou o intermediário redirecionando.
+
+### SEO e 360px — **C7 concluído em 29/10/2026**
+
+Em `apps/web/lib/seo.ts`, funções puras com **11 testes** em `lib/seo.spec.ts` — o primeiro teste do `apps/web`. Não contradiz a decisão de 21/10/2026: é função, não componente, e não pediu dependência nova.
+
+- **Anúncio:** título, descrição montada dos campos ("Casa à venda em Centro, Campinas - SP · 2 dormitórios · 195 m² · R$ 1.307.000"), canônico, Open Graph com a capa, e `RealEstateListing` em JSON-LD com uma oferta por finalidade
+- **Vitrine:** canônico sem filtro, `?pagina=` só da segunda em diante; **busca filtrada responde `noindex, follow`** — as combinações são infinitas; `RealEstateAgent` em JSON-LD com o contato público
+- **`/robots.txt`** fecha o painel, a API e as telas de conta. `metadataBase` vem de `WEB_ORIGIN`, a mesma variável que a API usa nos links de e-mail — nenhuma variável nova
+- **`/privacidade` e `/termos` ganharam `h1`**: o `CardTitle` é uma `div`, e eram as únicas páginas públicas sem título de página
+
+Três decisões a não reabrir:
+
+- **A rua não vai para o índice, nem quando a página a mostra.** O que o Google guarda sai do controle do corretor: mudar a visibilidade depois não tira a rua de lá. Descrição e JSON-LD levam bairro, cidade e UF. Pela mesma razão a descrição é montada dos campos, e não copiada do texto livre — é nele que o corretor escreve a rua quando esquece
+- **O JSON-LD é escapado** (`serializarJsonLd`): título é texto do corretor, e `</script>` dentro dele fecharia a tag e abriria script de terceiro na vitrine. Verificado por mutação: sem o escape de `<`, o teste quebra
+- **Sem sitemap** (decisão do responsável): um sitemap global listaria todas as organizações clientes para qualquer concorrente. O robô chega aos anúncios pelos links da vitrine
+
+**Pendência que o C7 torna concreta, a mesma do C2:** a imagem do Open Graph e do JSON-LD é a URL assinada, que expira em uma hora. A prévia do WhatsApp copia a miniatura ao ser gerada e não quebra; o Google guarda a URL e pode ficar com imagem quebrada. Resolve-se com o domínio público do R2.
+
+Verificado em 360px pelo Edge headless com `Emulation.setDeviceMetricsOverride` — mais simples que o `<iframe>`, e sem o recorte da largura mínima de janela: vitrine, vitrine com filtro inválido, anúncio, 404, `/privacidade` e `/painel/organizacao`, todas com `scrollWidth` igual a 360 e nenhum elemento além da borda.
 
 ---
 

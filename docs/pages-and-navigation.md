@@ -273,6 +273,8 @@ Dados, logo, contato público, bio e `slug`. Só `OWNER` e `ADMIN`.
 
 Trocar o `slug` mostra aviso claro: o endereço antigo continua funcionando com redirecionamento permanente (`OrganizationSlugHistory`) — **[DECIDIDO 19/10/2026]**. Anúncio impresso e link no Instagram não podem virar página de erro.
 
+> **Construído em 29/10/2026 (C3), só o endereço.** Nome, logo, contato público e bio ficam para um item próprio, por decisão do responsável. A troca pede confirmação com a consequência escrita antes do botão, e o menu mostra a tela só a quem tem `organizacao:editarSlug` — hoje ela não tem ação para os outros papéis.
+
 ### `/painel/auditoria`
 
 Log somente leitura, para `OWNER` e `ADMIN`. Nenhum papel edita: log que o administrador pode editar não serve de prova.
@@ -296,6 +298,10 @@ Lista os `Membership` ativos. A escolha é gravada **na sessão, no servidor** �
 A maior superfície de vazamento do produto. Não autentica ninguém.
 
 **[DECIDIDO 29/10/2026]** As páginas do catálogo são **geradas no servidor** (Server Components), ao contrário do painel, que busca os dados no navegador. O robô de busca e a prévia de link recebem o anúncio pronto, e a requisição à API sai do Next sem cookie nenhum. Sem cache enquanto a URL das fotos expirar em uma hora. Ver `docs/roadmap.md`, item C1.
+
+### SEO do catálogo — **[DECIDIDO 29/10/2026, item C7]**
+
+Canônico em toda página pública; busca filtrada com `noindex, follow`; título, descrição e JSON-LD montados dos campos, **nunca com a rua**; `/robots.txt` fechando painel, API e telas de conta. **Sem sitemap**: um sitemap global listaria a carteira de clientes da plataforma. Detalhes no roadmap, C7.
 
 ### `/o/[slug]` — vitrine
 

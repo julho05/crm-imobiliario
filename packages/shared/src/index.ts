@@ -33,3 +33,4 @@ export * from './schemas/negociacao';
 export * from './schemas/agenda';
 export * from './schemas/painel';
 export * from './schemas/midia';
+export * from './schemas/organizacao';

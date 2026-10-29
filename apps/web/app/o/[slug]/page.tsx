@@ -16,6 +16,7 @@ import {
   paginaDaConsulta,
   temFiltro,
 } from '@/lib/catalogo';
+import { dadosDaOrganizacao, origemDoSite, serializarJsonLd } from '@/lib/seo';
 import { cn } from '@/lib/utils';
 
 /**
@@ -43,6 +44,11 @@ import { cn } from '@/lib/utils';
  * Dois vazios diferentes, que o §8 do mapa de telas proíbe confundir: a
  * organização sem nenhum imóvel no ar, e a busca que não achou nada. O segundo
  * oferece limpar os filtros; o primeiro não tem o que oferecer.
+ *
+ * ## SEO (item C7)
+ *
+ * Canônico sem filtro, com `?pagina=` só da segunda em diante. A busca
+ * filtrada responde `noindex, follow`. Ver `lib/seo.ts`.
  */
 
 type Props = {
@@ -60,16 +66,37 @@ export async function generateMetadata({
 
   // Mesma URL que a página pede, filtros inclusive: o Next memoriza o `fetch`
   // dentro da mesma requisição, e a API é consultada uma vez só.
-  const { organizacao } = await buscarVitrine(
-    slug,
-    pagina,
-    lerFiltros(parametros).filtros,
-  );
+  const { filtros, erros } = lerFiltros(parametros);
+  const { organizacao } = await buscarVitrine(slug, pagina, filtros);
+
+  const titulo = `${organizacao.nome} — imóveis`;
+  const descricao =
+    organizacao.apresentacao ?? `Imóveis anunciados por ${organizacao.nome}.`;
+  const canonico =
+    pagina > 1
+      ? `/o/${organizacao.slug}?pagina=${pagina}`
+      : `/o/${organizacao.slug}`;
 
   return {
-    title: `${organizacao.nome} — imóveis`,
-    description:
-      organizacao.apresentacao ?? `Imóveis anunciados por ${organizacao.nome}.`,
+    title: titulo,
+    description: descricao,
+    alternates: { canonical: canonico },
+    // Busca filtrada fica fora do índice: as combinações são infinitas, e
+    // cada uma seria uma página quase igual à vitrine disputando com ela.
+    // `follow` continua, para o robô chegar aos anúncios por ali também.
+    robots:
+      temFiltro(filtros) || Object.keys(erros).length > 0
+        ? { index: false, follow: true }
+        : undefined,
+    openGraph: {
+      type: 'website',
+      locale: 'pt_BR',
+      siteName: organizacao.nome,
+      title: titulo,
+      description: descricao,
+      url: canonico,
+      images: organizacao.logoUrl ? [{ url: organizacao.logoUrl }] : undefined,
+    },
   };
 }
 
@@ -94,6 +121,16 @@ export default async function Vitrine({ params, searchParams }: Props) {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        // Escapado em `serializarJsonLd`: o nome e a apresentação são texto
+        // do cliente, e `</script>` dentro deles fecharia esta tag.
+        dangerouslySetInnerHTML={{
+          __html: serializarJsonLd(
+            dadosDaOrganizacao(organizacao, origemDoSite()),
+          ),
+        }}
+      />
       <CabecalhoDaOrganizacao organizacao={organizacao} naVitrine />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">

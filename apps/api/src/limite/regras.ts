@@ -39,6 +39,7 @@ export type Regra = {
 
 const QUINZE_MINUTOS = 15 * 60;
 const UMA_HORA = 60 * 60;
+const TRINTA_DIAS = 30 * 24 * UMA_HORA;
 
 export const LIMITES = {
   loginPorIp: {
@@ -86,5 +87,21 @@ export const LIMITES = {
     nome: 'captura:ip',
     maximo: 5,
     janelaEmSegundos: UMA_HORA,
+  },
+  /**
+   * Troca do endereço da vitrine (C3), por organização. Decisão de 29/10/2026.
+   *
+   * Não protege contra senha adivinhada, e sim contra ocupação: cada troca
+   * deixa o endereço antigo reservado para sempre, redirecionando. Sem teto,
+   * uma organização poderia guardar dezenas de nomes trocando em sequência.
+   *
+   * **Exceção à regra do topo:** aqui só conta a troca que vai acontecer.
+   * Contar a recusa por endereço ocupado trancaria por um mês quem tentou três
+   * nomes que já tinham dono.
+   */
+  trocaDeEnderecoPorOrganizacao: {
+    nome: 'endereco:organizacao',
+    maximo: 3,
+    janelaEmSegundos: TRINTA_DIAS,
   },
 } as const satisfies Record<string, Regra>;

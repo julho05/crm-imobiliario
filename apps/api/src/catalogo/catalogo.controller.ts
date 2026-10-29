@@ -10,6 +10,7 @@ import {
   Query,
   Req,
   ServiceUnavailableException,
+  UseFilters,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import {
@@ -25,6 +26,7 @@ import { ZodValidationPipe } from '../validacao/zod-validation.pipe';
 import { LimiteDeTentativasService } from '../limite/limite-de-tentativas.service';
 import { LIMITES } from '../limite/regras';
 import { CatalogoService } from './catalogo.service';
+import { FiltroDeEnderecoMovido } from './endereco-movido';
 import { conferirFicha, emitirFicha } from './ficha-do-formulario';
 
 /**
@@ -48,8 +50,15 @@ import { conferirFicha, emitirFicha } from './ficha-do-formulario';
  * fraco como mecanismo — o que protege é o serviço —, mas é forte como aviso:
  * quem acrescentar uma rota aqui vê, pelo caminho em que está escrevendo, que
  * ela responde a qualquer pessoa da internet.
+ *
+ * ## Slug antigo responde 308 (C3)
+ *
+ * Em todas as rotas que carregam a organização — ver `endereco-movido.ts`. O
+ * filtro é deste controller, e não global: só aqui um slug na URL pode ter
+ * mudado de dono.
  */
 @Controller('publico/organizacoes/:slug')
+@UseFilters(FiltroDeEnderecoMovido)
 export class CatalogoController {
   private readonly logger = new Logger(CatalogoController.name);
 

@@ -26,7 +26,9 @@ export default function Termos() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Termos de uso</CardTitle>
+        <CardTitle>
+          <h1>Termos de uso</h1>
+        </CardTitle>
         <CardDescription>Documento em elaboracao.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">

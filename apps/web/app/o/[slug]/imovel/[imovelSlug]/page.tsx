@@ -20,6 +20,12 @@ import {
   type ImovelPublico,
 } from '@/lib/catalogo';
 import { formatarArea, formatarDinheiro } from '@/lib/imoveis';
+import {
+  dadosDoAnuncio,
+  descricaoDoImovel,
+  origemDoSite,
+  serializarJsonLd,
+} from '@/lib/seo';
 
 /**
  * `/o/[slug]/imovel/[imovelSlug]` — o anúncio, item **C1**.
@@ -38,6 +44,12 @@ import { formatarArea, formatarDinheiro } from '@/lib/imoveis';
  * existe em produção — a API recusaria com 503, e formulário que não envia é
  * pior do que nenhum: o visitante preencheria e esperaria resposta. Nesse caso
  * o lado do anúncio volta a ser o do C1, só com o contato da organização.
+ *
+ * ## SEO (item C7)
+ *
+ * Título, descrição montada dos campos, canônico, Open Graph com a capa e
+ * `RealEstateListing` em JSON-LD — sem a rua, nem quando a página a mostra.
+ * Ver `lib/seo.ts`.
  */
 
 type Props = {
@@ -48,11 +60,38 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, imovelSlug } = await params;
   const { organizacao, imovel } = await buscarAnuncio(slug, imovelSlug);
 
+  const titulo = `${imovel.titulo} — ${organizacao.nome}`;
+  const descricao = descricaoDoImovel(imovel);
+  const canonico = `/o/${organizacao.slug}/imovel/${imovel.slug}`;
+  const capa =
+    imovel.capa ?? imovel.fotos.find((foto) => foto.kind === 'PHOTO') ?? null;
+
   return {
-    title: `${imovel.titulo} — ${organizacao.nome}`,
-    description: `${ROTULOS_DE_TIPO_DE_IMOVEL[imovel.tipo]} em ${localizacao(
-      imovel,
-    )}.`,
+    title: titulo,
+    description: descricao,
+    alternates: { canonical: canonico },
+    openGraph: {
+      type: 'website',
+      locale: 'pt_BR',
+      siteName: organizacao.nome,
+      title: titulo,
+      description: descricao,
+      url: canonico,
+      // A URL da foto expira em uma hora até o domínio público do R2. O
+      // WhatsApp copia a miniatura ao gerar a prévia, então o link enviado
+      // continua com imagem; quem guarda a URL (o Google) pode ficar com uma
+      // quebrada. Pendência registrada no C2.
+      images: capa
+        ? [
+            {
+              url: capa.url,
+              width: capa.largura ?? undefined,
+              height: capa.altura ?? undefined,
+              alt: capa.textoAlternativo ?? imovel.titulo,
+            },
+          ]
+        : undefined,
+    },
   };
 }
 
@@ -67,6 +106,16 @@ export default async function Anuncio({ params }: Props) {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        // Escapado em `serializarJsonLd`: o título é texto do corretor, e
+        // `</script>` dentro dele fecharia esta tag.
+        dangerouslySetInnerHTML={{
+          __html: serializarJsonLd(
+            dadosDoAnuncio(organizacao, imovel, origemDoSite()),
+          ),
+        }}
+      />
       <CabecalhoDaOrganizacao organizacao={organizacao} naVitrine={false} />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
