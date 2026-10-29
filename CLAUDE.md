@@ -111,7 +111,19 @@ Quatro decisões a não reabrir:
 
 **Pendência que o C2 torna concreta:** a URL de leitura da mídia expira em uma hora, e o catálogo público é cacheado por robô de busca. O adaptador do R2 precisa servir `PHOTO` e `FLOORPLAN` por domínio público — `DOCUMENT` continua assinado, e nunca aparece no catálogo.
 
-A vitrine pública (C1) ainda não existe.
+Em 29/10/2026 entrou o **C1** — a vitrine `/o/[slug]` e o anúncio `/o/[slug]/imovel/[imovelSlug]`. Continuam **788 testes**: o critério do item já é provado pela API do C2, e a tela não abre caminho de dados novo.
+
+**São as primeiras páginas geradas no servidor.** Todo o painel é `'use client'`; a vitrine não, porque o robô de busca e a prévia do link no WhatsApp precisam do anúncio pronto. A busca sai do Next para a API pelo `API_INTERNAL_URL`, sem cookie, e sem cache enquanto a URL da foto expirar em uma hora. O tipo do imóvel público mora em `apps/web/lib/catalogo.ts` e **não** deriva do tipo do CRM — tela da vitrine que tente mostrar o código não compila.
+
+Três decisões a não reabrir:
+
+- **404 com uma frase só** para slug inexistente, organização suspensa e imóvel fora do ar, e sem link para a vitrine — o link afirmaria que a organização existe
+- **Nenhum formulário de interesse antes do C5.** Formulário que não envia é pior que nenhum; até lá aparece o contato público, e o bloco some quando não há contato
+- **Galeria por `scroll-snap`, sem JavaScript**, e planta com `object-contain`
+
+**Divergência aberta para decisão:** o slug do imóvel carrega o código (`...-ap-001`, decisão do B1), e o C2 classifica `code` como privado. O código está na URL de todo anúncio. Registrado em `docs/roadmap.md`, pendências.
+
+Verificação de 360px sem ferramenta de navegador: o Edge headless tem largura mínima de janela acima de 360px e **recorta** a captura, parecendo transbordamento. Carregar a página dentro de um `<iframe>` de 360px dá a medida real.
 
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 

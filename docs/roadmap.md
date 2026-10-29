@@ -323,7 +323,7 @@ Depende de: B1 a B4 · mecanismo anti-spam decidido · texto do aviso de privaci
 
 | # | Tarefa | Critério de aceitação verificável | Depende de |
 |---|---|---|---|
-| C1 | Vitrine `/o/[slug]` | Mostra só `AVAILABLE` e `RESERVED`, este com etiqueta; teste confirma que `DRAFT`, `SOLD`, `RENTED`, `INACTIVE` e excluído **não** aparecem | B2 |
+| C1 | Vitrine `/o/[slug]` — *concluído em 29/10/2026* | Mostra só `AVAILABLE` e `RESERVED`, este com etiqueta; teste confirma que `DRAFT`, `SOLD`, `RENTED`, `INACTIVE` e excluído **não** aparecem | B2 |
 | C2 | DTO público — *concluído em 23/10/2026* | Construído campo a campo; **teste que falha se um campo novo do `Property` vazar** na resposta pública | B3 |
 | C3 | Redirecionamento de slug | Slug antigo responde 301 para o novo; adotar slug que ainda redireciona é recusado | A2 |
 | C4 | Busca e filtros | Filtros de `filtrosDoCatalogoSchema`; teste confirma que **não** há filtro por rua, CEP ou coordenada | C2 |
@@ -353,6 +353,25 @@ Decisões tomadas durante a implementação:
 **Ressalva registrada:** a chave do objeto de mídia é `organizacoes/<org>/imoveis/<imovel>/…` (decisão do B4), então o `organizationId` viaja **dentro da URL da foto** — hoje dentro da assinatura, no R2 visível no caminho. Ele não sai como campo, mas sai. Aceito: é identificador opaco, não credencial, e toda rota privada deriva a organização da sessão.
 
 **Pendência que o C2 torna concreta:** a URL de leitura da mídia expira em uma hora. No catálogo público isso não serve — a página fica em cache e o robô de busca guarda o HTML. O adaptador do R2 precisa servir `PHOTO` e `FLOORPLAN` por domínio público, como a porta já prevê; `DOCUMENT` continua atrás de URL assinada, e nunca aparece aqui.
+
+### Vitrine — **C1 concluído em 29/10/2026**
+
+Duas páginas em `apps/web/app/o/[slug]/`: a vitrine, paginada por `?pagina=`, e o anúncio em `imovel/[imovelSlug]`. Continuam **788 testes**: o critério de aceitação — `DRAFT`, `SOLD`, `RENTED`, `INACTIVE`, excluído e organização suspensa não aparecem — já é provado pela API em `test/catalogo/catalogo.http.spec.ts`, e a tela não abre caminho de dados novo. Sem teste de componente, pela decisão de 21/10/2026.
+
+**Gerada no servidor, ao contrário do painel.** As páginas são Server Components, sem `'use client'`: o robô de busca e a prévia do link no WhatsApp recebem o anúncio pronto, e o C7 depende disso. A requisição sai do Next para a API pelo `API_INTERNAL_URL`, **sem cookie** — o corretor logado vê a vitrine exatamente como o cliente.
+
+Decisões tomadas durante a implementação:
+
+- **Tipo próprio em `apps/web/lib/catalogo.ts`**, espelho de `resposta-publica.ts` e não de `lib/imoveis.ts`. Uma tela da vitrine que tentasse mostrar o código do imóvel não compila
+- **Sem cache** (`no-store`): a URL da foto expira em uma hora. Volta a ser discutido com o adaptador do R2
+- **404 de verdade, com uma frase só**, para slug inexistente, organização suspensa e imóvel fora do ar. A página não oferece link para a vitrine, porque isso afirmaria que a organização existe
+- **Sem formulário de interesse** até o C5. Formulário que não envia é pior do que nenhum; até lá, o anúncio mostra o contato público da organização, e o bloco some quando ela não tem nenhum
+- **Galeria por rolagem nativa com `scroll-snap`**, sem JavaScript. A planta usa `object-contain`, porque o corte comeria as medidas
+- O seed dá apresentação e contato à Aurora e ao Paulo Reis; a **Meridiano fica sem**, para que a vitrine de uma conta nova seja exercitada
+
+Verificado contra o servidor em execução: com imóveis vendido, alugado, inativo e rascunho **publicados à força** no banco, nenhum aparece e o acesso direto responde 404; os três níveis de endereço saem como `montarEndereco` decide, e o CEP em nenhum; foto e planta enviadas pelo fluxo do B4 aparecem na galeria e na capa do cartão; as duas páginas cabem em 360px. Um defeito apareceu na captura de tela e foi corrigido: o cartão encolhia até o conteúdo, e a grade saía com larguras diferentes.
+
+**Divergência encontrada, para decisão do responsável:** o slug do imóvel é montado com o título **e o código** (`apartamento-no-pinheiros-ap-001`, decisão do B1), e o C2 classifica `code` como coluna **privada** — "revela o tamanho da carteira". O código sai, portanto, na URL de todo anúncio. Corrigir muda os links já compartilhados e precisa de outro desempate para a unicidade do slug; manter exige tirar `code` da lista privada, já que a imobiliária usa o código no próprio anúncio (decisão de 21/10/2026). Ver a tabela de pendências.
 
 ---
 
@@ -388,6 +407,7 @@ Um corretor entra, cadastra e publica imóvel, recebe lead do catálogo, agenda 
 | ~~Campos obrigatórios do imóvel~~ | ~~B1~~ | **Decidido em 21/10/2026**: piso do banco mais preço coerente com a finalidade. Ver `packages/shared/src/schemas/imovel.ts` |
 | Unificar leads duplicados no MVP | B5 | Responsável |
 | Mecanismo anti-spam | C6 | Responsável (custo e LGPD) |
+| Código do imóvel no slug público: tirar do slug ou reclassificar `code` como público | Coerência entre B1 e C2; quanto mais tarde, mais links compartilhados quebram | Responsável |
 | Parecer jurídico sobre anonimização | D6, piloto | Advogado — **não é decisão técnica** |
 | Marca verificada no INPI e Registro.br | Qualquer uso público | Responsável |
 | ~~Seis etapas do funil ou cinco?~~ | ~~A2~~ | **Seis**, confirmado em 21/10/2026: era divergência de redação, não decisão em aberto. O código já semeava seis desde o A2, e `data-model.md` §3.4 foi corrigido |

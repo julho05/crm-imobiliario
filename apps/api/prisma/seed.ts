@@ -859,6 +859,12 @@ async function main() {
       negociacoes: negociacoesDaAurora(),
       visitas: visitasDaAurora(),
       tarefas: tarefasDaAurora(),
+      vitrine: {
+        apresentacao:
+          'Ha 15 anos ajudando familias a encontrar o imovel certo.\nAtendimento de segunda a sabado.',
+        telefone: '(11) 3000-1000',
+        email: 'contato@exemplo.com',
+      },
     });
 
     console.log(
@@ -1018,6 +1024,13 @@ async function main() {
       tipo: 'SOLO',
       pessoas: AUTONOMO,
       senhaHash,
+      vitrine: {
+        apresentacao: 'Corretor autonomo, CRECI 00000-F. Atendo pelo WhatsApp.',
+        telefone: '(11) 98000-2000',
+        // Diferente do e-mail de login, de proposito: o contato publico e o
+        // que o corretor escolhe divulgar, e nao precisa ser a conta.
+        email: 'atendimento.paulo@exemplo.com',
+      },
       imoveis: [
         {
           titulo: 'Apartamento compacto perto do metro',
@@ -1261,10 +1274,23 @@ async function criarOrganizacao(
     negociacoes?: NegociacaoDoSeed[];
     visitas?: VisitaDoSeed[];
     tarefas?: TarefaDoSeed[];
+    /**
+     * O que a vitrine publica (item C1). Opcional de proposito: ainda nao ha
+     * tela que preencha esses campos, e uma organizacao real comeca sem eles —
+     * a Meridiano fica assim para que a vitrine sem contato seja exercitada.
+     */
+    vitrine?: { apresentacao: string; telefone: string; email: string };
   },
 ): Promise<string> {
   const organizacao = await prisma.organization.create({
-    data: { name: dados.nome, slug: dados.slug, kind: dados.tipo },
+    data: {
+      name: dados.nome,
+      slug: dados.slug,
+      kind: dados.tipo,
+      publicBio: dados.vitrine?.apresentacao,
+      publicPhone: dados.vitrine?.telefone,
+      publicEmail: dados.vitrine?.email,
+    },
     select: { id: true },
   });
 
@@ -1616,6 +1642,11 @@ function imprimirResumo(): void {
     '  Entre com tiago@exemplo.com e abra a agenda daqui a dois dias:\n' +
       '  ele conduz a visita de uma cliente da Bianca. Ve o nome e o telefone\n' +
       '  dela, e **nao** ve o link para a ficha — a decisao de 21/10/2026.\n',
+  );
+
+  console.log(
+    '  Vitrines publicas, sem login: /o/aurora, /o/meridiano e /o/paulo-reis.\n' +
+      '  A Meridiano nao tem apresentacao nem contato, como uma conta nova.\n',
   );
 }
 

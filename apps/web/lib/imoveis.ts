@@ -94,8 +94,14 @@ export function formatarArea(valor: number | null): string {
  *
  * `BOTH` mostra os dois, porque esconder um deles num imovel que aceita venda e
  * locacao e justamente a informacao que o cliente ligou para perguntar.
+ *
+ * Recebe so os tres campos que usa, e nao o `Imovel` inteiro, porque a vitrine
+ * publica tambem mostra preco e o imovel dela e outro tipo — sem codigo, sem
+ * responsavel, sem nada que o visitante nao deva receber.
  */
-export function precoPorFinalidade(imovel: Imovel): string {
+export function precoPorFinalidade(
+  imovel: Pick<Imovel, 'finalidade' | 'preco' | 'precoDeAluguel'>,
+): string {
   switch (imovel.finalidade) {
     case 'SALE':
       return formatarDinheiro(imovel.preco);

@@ -294,6 +294,8 @@ Lista os `Membership` ativos. A escolha é gravada **na sessão, no servidor** �
 
 A maior superfície de vazamento do produto. Não autentica ninguém.
 
+**[DECIDIDO 29/10/2026]** As páginas do catálogo são **geradas no servidor** (Server Components), ao contrário do painel, que busca os dados no navegador. O robô de busca e a prévia de link recebem o anúncio pronto, e a requisição à API sai do Next sem cookie nenhum. Sem cache enquanto a URL das fotos expirar em uma hora. Ver `docs/roadmap.md`, item C1.
+
 ### `/o/[slug]` — vitrine
 
 Identidade da organização (nome, logo, bio, contato público) e os imóveis publicados, com busca e filtros (`filtrosDoCatalogoSchema`).
