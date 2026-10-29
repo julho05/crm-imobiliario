@@ -123,6 +123,16 @@ Três decisões a não reabrir:
 
 **O código do imóvel é público desde 29/10/2026.** O C1 revelou que ele já saía no slug (`...-ap-001`, decisão do B1) enquanto o C2 o classificava como privado. Decidido a favor de público, antes do lançamento, quando não havia link compartilhado a quebrar: o código no anúncio é padrão do mercado e é o que o cliente cita no WhatsApp. O anúncio mostra "Cód. AP-001" e pede ao visitante que o informe no contato. Registrado em `docs/data-model.md` §5. Um teste novo exige o código na resposta pública: são **789 testes**.
 
+Em 29/10/2026, no mesmo dia, entrou o **C4** — busca e filtros da vitrine. São **810 testes**.
+
+**O critério se prova pela resposta, não pelo schema.** O teste cadastra rua, número e CEP num imóvel e busca por cada um, nos três níveis de visibilidade, esperando zero. Verificado por mutação: acrescentar `street` à busca livre quebra os três casos. A busca livre olha título, código, bairro e cidade — **nunca a rua**, nem no `FULL`.
+
+Três decisões a não reabrir:
+
+- **Preço exige comprar ou alugar**, e o imóvel `BOTH` aparece nas duas buscas, comparado pelo preço da finalidade pedida
+- **Mínimo zero é ignorado** e todo mínimo maior que zero exclui o imóvel sem o valor — a consequência da decisão de 21/10/2026 sobre campos opcionais
+- **Parâmetro desconhecido é ignorado, não recusado**, e campo em branco vale como ausente: link compartilhado chega com `fbclid`, e formulário GET manda `?precoMinimo=`
+
 Verificação de 360px sem ferramenta de navegador: o Edge headless tem largura mínima de janela acima de 360px e **recorta** a captura, parecendo transbordamento. Carregar a página dentro de um `<iframe>` de 360px dá a medida real.
 
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.

@@ -306,6 +306,8 @@ Servido por **DTO público explícito, campo a campo**. Nada de `select *` com e
 
 Os filtros **não** incluem rua, CEP nem coordenada. Permitir isso contornaria `addressVisibility` pela porta da busca.
 
+**[DECIDIDO 29/10/2026, item C4]** A busca é um formulário HTML enviado por GET, sem JavaScript: a busca vira URL compartilhável. A busca livre procura no título, no código, no bairro e na cidade — nunca na rua, em nível de visibilidade nenhum. Preço exige "comprar" ou "alugar", e o imóvel que aceita as duas finalidades aparece nas duas buscas, comparado pelo preço da finalidade pedida. Filtro inválido volta como erro no campo, com a lista sem filtro. Os filtros secundários ficam num `<details>`, que abre sozinho quando há filtro em uso.
+
 Slug antigo responde redirecionamento permanente. Slug inexistente responde 404 — nunca "organização suspensa", que informaria sobre o cliente.
 
 ### `/o/[slug]/imovel/[imovelSlug]` — detalhe

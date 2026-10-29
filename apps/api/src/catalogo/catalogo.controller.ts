@@ -1,5 +1,10 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { paginacaoSchema, type Paginacao } from '@app/shared';
+import {
+  filtrosDoCatalogoSchema,
+  paginacaoSchema,
+  type FiltrosDoCatalogo,
+  type Paginacao,
+} from '@app/shared';
 import { ZodValidationPipe } from '../validacao/zod-validation.pipe';
 import { CatalogoService } from './catalogo.service';
 
@@ -34,12 +39,21 @@ export class CatalogoController {
     return this.catalogo.organizacao(slug);
   }
 
+  /**
+   * A vitrine, com os filtros do item C4.
+   *
+   * Os dois `@Query` leem a mesma query string, cada um pegando o que conhece.
+   * O schema dos filtros descarta chave desconhecida em vez de recusá-la — ver
+   * a nota em `packages/shared/src/schemas/catalogo.ts` sobre `fbclid`.
+   */
   @Get('imoveis')
   listar(
     @Param('slug') slug: string,
     @Query(new ZodValidationPipe(paginacaoSchema)) paginacao: Paginacao,
+    @Query(new ZodValidationPipe(filtrosDoCatalogoSchema))
+    filtros: FiltrosDoCatalogo,
   ) {
-    return this.catalogo.listarImoveis(slug, paginacao);
+    return this.catalogo.listarImoveis(slug, paginacao, filtros);
   }
 
   /**

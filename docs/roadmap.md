@@ -326,7 +326,7 @@ Depende de: B1 a B4 · mecanismo anti-spam decidido · texto do aviso de privaci
 | C1 | Vitrine `/o/[slug]` — *concluído em 29/10/2026* | Mostra só `AVAILABLE` e `RESERVED`, este com etiqueta; teste confirma que `DRAFT`, `SOLD`, `RENTED`, `INACTIVE` e excluído **não** aparecem | B2 |
 | C2 | DTO público — *concluído em 23/10/2026* | Construído campo a campo; **teste que falha se um campo novo do `Property` vazar** na resposta pública | B3 |
 | C3 | Redirecionamento de slug | Slug antigo responde 301 para o novo; adotar slug que ainda redireciona é recusado | A2 |
-| C4 | Busca e filtros | Filtros de `filtrosDoCatalogoSchema`; teste confirma que **não** há filtro por rua, CEP ou coordenada | C2 |
+| C4 | Busca e filtros — *concluído em 29/10/2026* | Filtros de `filtrosDoCatalogoSchema`; teste confirma que **não** há filtro por rua, CEP ou coordenada | C2 |
 | C5 | Captura de lead | Consentimento explícito obrigatório; grava versão do aviso e **hash** do IP; resposta não devolve IDs internos; lead vai ao responsável do imóvel ou à fila | B5, C1 |
 | C6 | Anti-spam | Limite por IP comprovado em teste; mecanismo escolhido registrado em `docs/` | C5 |
 | C7 | SEO e responsividade | Título, descrição e dados estruturados por imóvel; páginas utilizáveis em tela de 360px | C1 |
@@ -372,6 +372,27 @@ Decisões tomadas durante a implementação:
 Verificado contra o servidor em execução: com imóveis vendido, alugado, inativo e rascunho **publicados à força** no banco, nenhum aparece e o acesso direto responde 404; os três níveis de endereço saem como `montarEndereco` decide, e o CEP em nenhum; foto e planta enviadas pelo fluxo do B4 aparecem na galeria e na capa do cartão; as duas páginas cabem em 360px. Um defeito apareceu na captura de tela e foi corrigido: o cartão encolhia até o conteúdo, e a grade saía com larguras diferentes.
 
 **Divergência encontrada e decidida no mesmo dia:** o slug do imóvel é montado com o título **e o código** (`apartamento-no-pinheiros-ap-001`, decisão do B1), e o C2 classificava `code` como coluna **privada**. O código já saía na URL de todo anúncio. **Decidido em 29/10/2026: o código é público** — ver `data-model.md` §5. Ele passou para `COLUNAS_PUBLICAS_DE_IMOVEL`, sai como `codigo` na API pública, com teste que exige a presença dele, e o anúncio mostra "Cód. AP-001" e pede ao visitante que o informe no contato.
+
+### Busca e filtros — **C4 concluído em 29/10/2026**
+
+`GET /api/publico/organizacoes/:slug/imoveis` aceita os filtros de `filtrosDoCatalogoSchema`, que saiu de `captura-de-lead.ts` para `packages/shared/src/schemas/catalogo.ts` e trocou texto livre por enumeração em tipo e finalidade. Na vitrine, um formulário GET sem JavaScript. São **21 testes novos** em `test/catalogo/busca.http.spec.ts`.
+
+**O teste que cumpre o critério não confere o schema — confere a resposta.** Um imóvel com rua, número, complemento e CEP cadastrados, nos três níveis de visibilidade, e a busca livre por cada um deles devolvendo zero. Conferir que o schema não tem campo `rua` provaria pouco, porque chave desconhecida é descartada e `?cep=` nunca falharia. A mutação foi feita na prática: com `street` acrescentado à busca livre, os três casos quebram.
+
+Decisões tomadas durante a implementação:
+
+- **Os filtros entram ao lado do `visivel()`, num `AND`**, e nunca dentro dele: filtro nenhum alarga o recorte, e há teste com rascunho, vendido, despublicado, excluído e outra organização casando com o termo
+- **Busca livre em título, código, bairro e cidade.** Nunca na rua, em nível nenhum — nem no `FULL`, para não depender de conferir a visibilidade dentro do filtro
+- **Preço exige finalidade; `BOTH` aparece nas duas buscas**, comparado pelo preço da finalidade pedida. Testado com um `BOTH` de venda cara e aluguel barato, que é o caso que denuncia o campo trocado
+- **Ausência nunca vira zero**, como decidido em 21/10/2026. Mínimo zero é ignorado, porque aplicado também esconderia o imóvel sem a informação. Área usa a útil quando existe, senão a total
+- **Parâmetro desconhecido é ignorado**, não recusado: `fbclid` e `utm_source` chegam em todo link compartilhado
+- **Campo em branco é ausência.** O formulário GET manda `?precoMinimo=`, que o `coerce` transformaria em zero
+- **Filtro inválido não derruba a página:** volta como erro no campo, e a lista mostra tudo com um aviso. Aplicar só a parte válida mostraria um resultado que não corresponde ao pedido
+- **Acento e maiúscula** ficam com a collation da coluna, `utf8mb4_unicode_ci` — conferida no banco, e coberta por teste nos dois sentidos
+
+Verificado contra o servidor em execução: contagem por finalidade e por termo, formulário enviado em branco, erro de preço sem finalidade com a lista inteira, paginação de uma busca de 15 resultados levando o termo na página 2, e as duas larguras.
+
+**Fica para quando houver motivo:** busca textual (FULLTEXT). O `LIKE '%termo%'` não usa índice, e basta enquanto a busca roda dentro de uma organização só.
 
 ---
 

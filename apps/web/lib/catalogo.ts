@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation';
-import type {
-  MediaKind,
-  OrganizationKind,
-  PropertyPurpose,
-  PropertyStatus,
-  PropertyType,
+import {
+  filtrosDoCatalogoSchema,
+  type FiltrosDoCatalogo,
+  type MediaKind,
+  type OrganizationKind,
+  type PropertyPurpose,
+  type PropertyStatus,
+  type PropertyType,
 } from '@app/shared';
 
 /**
@@ -105,11 +107,11 @@ export const POR_PAGINA_DA_VITRINE = 12;
 export function buscarVitrine(
   slug: string,
   pagina: number,
+  filtros: FiltrosDoCatalogo = {},
 ): Promise<VitrinePublica> {
-  const consulta = new URLSearchParams({
-    pagina: String(pagina),
-    porPagina: String(POR_PAGINA_DA_VITRINE),
-  });
+  const consulta = consultaDosFiltros(filtros);
+  consulta.set('pagina', String(pagina));
+  consulta.set('porPagina', String(POR_PAGINA_DA_VITRINE));
 
   return lerDaApi(
     `/publico/organizacoes/${encodeURIComponent(slug)}/imoveis?${consulta}`,
@@ -179,6 +181,78 @@ async function lerDaApi<T>(caminho: string): Promise<T> {
 export function paginaDaConsulta(valor: string | string[] | undefined): number {
   const numero = Number(Array.isArray(valor) ? valor[0] : valor);
   return Number.isInteger(numero) && numero >= 1 ? numero : 1;
+}
+
+type ParametrosDaUrl = { [chave: string]: string | string[] | undefined };
+
+/**
+ * Os filtros da URL da vitrine, validados pelo mesmo contrato da API — item
+ * **C4**.
+ *
+ * ## Filtro inválido não derruba a página
+ *
+ * Preço sem finalidade, mínimo maior que o máximo: a API responderia 400, e a
+ * página viraria tela de erro. Aqui a validação acontece **antes**, e o que
+ * falhar volta como mensagem por campo, com a vitrine mostrada sem filtro
+ * nenhum. Aplicar só a parte válida seria pior: a pessoa veria um resultado
+ * que não corresponde ao que pediu, sem saber por quê.
+ *
+ * `valores` guarda o texto cru de cada campo, para o formulário reabrir com o
+ * que a pessoa digitou — inclusive o que estava errado, que é o que ela
+ * precisa corrigir.
+ */
+export function lerFiltros(parametros: ParametrosDaUrl): {
+  filtros: FiltrosDoCatalogo;
+  erros: Record<string, string>;
+  valores: Record<string, string>;
+} {
+  const valores = Object.fromEntries(
+    Object.entries(parametros).flatMap(([chave, valor]) => {
+      const primeiro = Array.isArray(valor) ? valor[0] : valor;
+      return primeiro === undefined ? [] : [[chave, primeiro]];
+    }),
+  );
+
+  const resultado = filtrosDoCatalogoSchema.safeParse(valores);
+
+  if (resultado.success) {
+    return { filtros: resultado.data, erros: {}, valores };
+  }
+
+  const erros: Record<string, string> = {};
+
+  for (const problema of resultado.error.issues) {
+    const campo = String(problema.path[0] ?? 'formulario');
+    erros[campo] ??= problema.message;
+  }
+
+  return { filtros: {}, erros, valores };
+}
+
+/**
+ * Os filtros de volta a query string — para a API e para os links de
+ * paginação, que precisam levar a busca junto.
+ *
+ * Só o que tem valor: `?tipo=&termo=` na URL de cada página seria ruído no
+ * link que a pessoa compartilha.
+ */
+export function consultaDosFiltros(
+  filtros: FiltrosDoCatalogo,
+): URLSearchParams {
+  const consulta = new URLSearchParams();
+
+  for (const [chave, valor] of Object.entries(filtros)) {
+    if (valor !== undefined && valor !== '') {
+      consulta.set(chave, String(valor));
+    }
+  }
+
+  return consulta;
+}
+
+/** Algum filtro em uso? Distingue "vitrine vazia" de "busca sem resultado". */
+export function temFiltro(filtros: FiltrosDoCatalogo): boolean {
+  return consultaDosFiltros(filtros).size > 0;
 }
 
 /** "Pinheiros, São Paulo - SP" — a localização que sai em todos os níveis. */

@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   MIDIA_PUBLICA,
+  PropertyPurpose,
   STATUS_VISIVEIS_NO_CATALOGO,
+  type FiltrosDoCatalogo,
   type Paginacao,
 } from '@app/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -68,10 +70,16 @@ export class CatalogoService {
    * uma consulta para a página inteira, e não uma por imóvel. É o que o item
    * B10 vai cobrar com teste que conta consultas, e a listagem pública é
    * justamente onde o N+1 nasceria.
+   *
+   * Os filtros do C4 entram **ao lado** do `visivel()`, num `AND`, e nunca
+   * dentro dele: o recorte continua sendo uma cláusula só, e filtro nenhum
+   * consegue alargá-lo — só estreitar. A contagem usa a mesma cláusula, para
+   * "12 imóveis" significar os doze que a busca alcança.
    */
   async listarImoveis(
     slug: string,
     paginacao: Paginacao,
+    filtros: FiltrosDoCatalogo = {},
   ): Promise<{
     organizacao: RespostaPublicaDeOrganizacao;
     imoveis: RespostaPublicaDeImovel[];
@@ -80,7 +88,9 @@ export class CatalogoService {
     porPagina: number;
   }> {
     const organizacao = await this.carregarOrganizacao(slug);
-    const onde = this.visivel(organizacao.id);
+    const onde: Prisma.PropertyWhereInput = {
+      AND: [this.visivel(organizacao.id), ...filtrar(filtros)],
+    };
 
     const [registros, total] = await Promise.all([
       this.prisma.property.findMany({
@@ -231,6 +241,92 @@ export class CatalogoService {
       })),
     );
   }
+}
+
+/**
+ * Os filtros da busca, como cláusulas do Prisma — item **C4**.
+ *
+ * ## A rua não é consultada, em nenhuma cláusula
+ *
+ * Nem `street`, nem `number`, nem `complement`, nem `zipCode`, nem as
+ * coordenadas. A busca livre olha título, código, bairro e cidade. Se a rua
+ * entrasse no `termo`, o visitante que não a vê descobriria qual é testando
+ * nomes até a vitrine responder — o `addressVisibility` contornado pela porta
+ * da busca. Há teste para exatamente isso, com a rua preenchida e oculta.
+ *
+ * ## Ausência nunca vira zero
+ *
+ * `bedrooms >= 2` em SQL é falso para `NULL`, então o imóvel sem dormitórios
+ * informados sai do resultado sem cláusula extra — que é a regra de 21/10/2026.
+ * Um `?? 0` em qualquer lugar daqui inverteria isso em silêncio.
+ *
+ * O mínimo zero é ignorado (`if (f.quartosMinimo)`), e de propósito: aplicado,
+ * ele também excluiria o imóvel sem o valor, e o visitante não pediu filtro.
+ *
+ * ## Maiúscula e acento
+ *
+ * `contains` vira `LIKE`, e quem decide se "sao paulo" encontra "São Paulo" é
+ * a collation da coluna (`utf8mb4_unicode_ci`, insensível às duas — conferido
+ * no banco em 29/10/2026, e coberto por teste), não o código. O Prisma não
+ * aceita `mode: 'insensitive'` no MySQL.
+ */
+function filtrar(f: FiltrosDoCatalogo): Prisma.PropertyWhereInput[] {
+  const clausulas: Prisma.PropertyWhereInput[] = [];
+
+  if (f.termo) {
+    clausulas.push({
+      OR: [
+        { title: { contains: f.termo } },
+        { code: { contains: f.termo } },
+        { neighborhood: { contains: f.termo } },
+        { city: { contains: f.termo } },
+      ],
+    });
+  }
+
+  if (f.cidade) clausulas.push({ city: f.cidade });
+  if (f.bairro) clausulas.push({ neighborhood: f.bairro });
+  if (f.estado) clausulas.push({ state: f.estado });
+  if (f.tipo) clausulas.push({ type: f.tipo });
+
+  if (f.finalidade) {
+    // O imóvel que aceita as duas finalidades aparece nas duas buscas.
+    clausulas.push({ purpose: { in: [f.finalidade, PropertyPurpose.BOTH] } });
+
+    // E o preço comparado é o da finalidade pedida: quem procura aluguel até
+    // R$ 3.000 não quer ver o imóvel `BOTH` cujo preço de venda é R$ 2.500.
+    const faixa = {
+      ...(f.precoMinimo ? { gte: f.precoMinimo } : {}),
+      ...(f.precoMaximo ? { lte: f.precoMaximo } : {}),
+    };
+
+    if (Object.keys(faixa).length > 0) {
+      clausulas.push(
+        f.finalidade === PropertyPurpose.SALE
+          ? { price: faixa }
+          : { rentPrice: faixa },
+      );
+    }
+  }
+
+  if (f.quartosMinimo) clausulas.push({ bedrooms: { gte: f.quartosMinimo } });
+  if (f.banheirosMinimo) {
+    clausulas.push({ bathrooms: { gte: f.banheirosMinimo } });
+  }
+  if (f.vagasMinimo) clausulas.push({ parkingSpots: { gte: f.vagasMinimo } });
+
+  if (f.areaMinima) {
+    // A útil quando existe, senão a total — o mesmo critério do cartão. Sem
+    // nenhuma das duas, o imóvel sai.
+    clausulas.push({
+      OR: [
+        { areaUseful: { gte: f.areaMinima } },
+        { areaUseful: null, areaTotal: { gte: f.areaMinima } },
+      ],
+    });
+  }
+
+  return clausulas;
 }
 
 /**

@@ -25,6 +25,7 @@ export * from './rotulos';
 export * from './primitivos';
 export * from './schemas/autenticacao';
 export * from './schemas/captura-de-lead';
+export * from './schemas/catalogo';
 export * from './schemas/imovel';
 export * from './schemas/lead';
 export * from './schemas/negociacao';

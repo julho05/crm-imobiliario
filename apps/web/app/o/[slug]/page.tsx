@@ -6,8 +6,16 @@ import {
   ContatoDaOrganizacao,
 } from '@/components/catalogo/cabecalho-da-organizacao';
 import { CartaoDeImovel } from '@/components/catalogo/cartao-de-imovel';
+import { FormularioDeBusca } from '@/components/catalogo/formulario-de-busca';
+import { Aviso } from '@/components/aviso';
 import { buttonVariants } from '@/components/ui/button';
-import { buscarVitrine, paginaDaConsulta } from '@/lib/catalogo';
+import {
+  buscarVitrine,
+  consultaDosFiltros,
+  lerFiltros,
+  paginaDaConsulta,
+  temFiltro,
+} from '@/lib/catalogo';
 import { cn } from '@/lib/utils';
 
 /**
@@ -26,7 +34,15 @@ import { cn } from '@/lib/utils';
  * `apps/api/test/catalogo/catalogo.http.spec.ts`. A tela não filtra nada de
  * novo, e não deveria: filtro no site é filtro depois de o dado já ter saído.
  *
- * Busca e filtros são o C4.
+ * ## A busca é a URL (item C4)
+ *
+ * Os filtros vêm de `searchParams`, são validados com o contrato da API em
+ * `lerFiltros` e vão para a API **e** para os links de paginação — a página 2
+ * de uma busca é a página 2 daquela busca, e não da vitrine inteira.
+ *
+ * Dois vazios diferentes, que o §8 do mapa de telas proíbe confundir: a
+ * organização sem nenhum imóvel no ar, e a busca que não achou nada. O segundo
+ * oferece limpar os filtros; o primeiro não tem o que oferecer.
  */
 
 type Props = {
@@ -39,11 +55,16 @@ export async function generateMetadata({
   searchParams,
 }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const pagina = paginaDaConsulta((await searchParams).pagina);
+  const parametros = await searchParams;
+  const pagina = paginaDaConsulta(parametros.pagina);
 
-  // Mesma URL que a página pede: o Next memoriza o `fetch` dentro da mesma
-  // requisição, e a API é consultada uma vez só.
-  const { organizacao } = await buscarVitrine(slug, pagina);
+  // Mesma URL que a página pede, filtros inclusive: o Next memoriza o `fetch`
+  // dentro da mesma requisição, e a API é consultada uma vez só.
+  const { organizacao } = await buscarVitrine(
+    slug,
+    pagina,
+    lerFiltros(parametros).filtros,
+  );
 
   return {
     title: `${organizacao.nome} — imóveis`,
@@ -54,13 +75,22 @@ export async function generateMetadata({
 
 export default async function Vitrine({ params, searchParams }: Props) {
   const { slug } = await params;
-  const pagina = paginaDaConsulta((await searchParams).pagina);
+  const parametros = await searchParams;
+  const pagina = paginaDaConsulta(parametros.pagina);
+  const { filtros, erros, valores } = lerFiltros(parametros);
   const { organizacao, imoveis, total, porPagina } = await buscarVitrine(
     slug,
     pagina,
+    filtros,
   );
 
   const totalDePaginas = Math.max(1, Math.ceil(total / porPagina));
+  const filtrando = temFiltro(filtros);
+  const comErro = Object.keys(erros).length > 0;
+  const plural = total === 1 ? 'imóvel' : 'imóveis';
+
+  // Sem imóvel nenhum e sem filtro, a busca não tem o que procurar.
+  const vitrineVazia = total === 0 && !filtrando;
 
   return (
     <>
@@ -80,17 +110,46 @@ export default async function Vitrine({ params, searchParams }: Props) {
           </section>
         )}
 
-        <h2 className="mb-4 text-xl font-semibold">
+        {!vitrineVazia && (
+          <FormularioDeBusca
+            slug={organizacao.slug}
+            valores={valores}
+            erros={erros}
+            emUso={filtrando || comErro}
+          />
+        )}
+
+        {comErro && (
+          <Aviso tom="erro" className="mb-4">
+            Algum filtro precisa de ajuste — veja os campos marcados. Enquanto
+            isso, a lista mostra todos os imóveis.
+          </Aviso>
+        )}
+
+        <h2 className="mb-4 text-xl font-semibold" aria-live="polite">
           {total === 0
             ? 'Imóveis'
-            : `${total} ${total === 1 ? 'imóvel anunciado' : 'imóveis anunciados'}`}
+            : filtrando
+              ? `${total} ${plural} ${total === 1 ? 'encontrado' : 'encontrados'}`
+              : `${total} ${plural} ${total === 1 ? 'anunciado' : 'anunciados'}`}
         </h2>
 
-        {total === 0 ? (
+        {vitrineVazia ? (
           // Vazio sem dados (§8): não há ação para o visitante, então a frase
           // diz só o que acontece e não o culpa de nada.
           <p className="text-muted-foreground bg-card rounded-lg border p-6 text-center">
             Nenhum imóvel anunciado no momento.
+          </p>
+        ) : total === 0 ? (
+          // Vazio por filtro (§8): diz que foi o filtro, e oferece desfazê-lo.
+          <p className="text-muted-foreground bg-card rounded-lg border p-6 text-center">
+            Nenhum imóvel com esses filtros.{' '}
+            <Link
+              href={`/o/${organizacao.slug}`}
+              className="text-foreground underline"
+            >
+              Ver todos os imóveis
+            </Link>
           </p>
         ) : imoveis.length === 0 ? (
           // Página além da última — link antigo, ou imóveis que saíram do ar
@@ -121,6 +180,7 @@ export default async function Vitrine({ params, searchParams }: Props) {
         {totalDePaginas > 1 && imoveis.length > 0 && (
           <Paginacao
             slug={organizacao.slug}
+            consulta={consultaDosFiltros(filtros)}
             pagina={pagina}
             totalDePaginas={totalDePaginas}
           />
@@ -136,18 +196,31 @@ export default async function Vitrine({ params, searchParams }: Props) {
  * Links, e não botões: cada página tem URL própria, que o robô de busca segue
  * e que o visitante compartilha. O extremo vira texto apagado com
  * `aria-disabled`, para a posição dos controles não mudar entre páginas.
+ *
+ * `consulta` leva os filtros da busca junto. A página 1 fica sem `?pagina=`,
+ * para a primeira página da vitrine ter um endereço só.
  */
 function Paginacao({
   slug,
+  consulta,
   pagina,
   totalDePaginas,
 }: {
   slug: string;
+  consulta: URLSearchParams;
   pagina: number;
   totalDePaginas: number;
 }) {
-  const endereco = (numero: number) =>
-    numero === 1 ? `/o/${slug}` : `/o/${slug}?pagina=${numero}`;
+  const endereco = (numero: number) => {
+    const destino = new URLSearchParams(consulta);
+
+    if (numero > 1) {
+      destino.set('pagina', String(numero));
+    }
+
+    const texto = destino.toString();
+    return texto ? `/o/${slug}?${texto}` : `/o/${slug}`;
+  };
 
   const classe = cn(buttonVariants({ variant: 'outline', size: 'sm' }));
   const desligado = cn(classe, 'pointer-events-none opacity-50');
