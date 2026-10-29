@@ -32,9 +32,30 @@ jobs:
           --health-retries=12
           --health-start-period=30s
 
+    # Ate 29/10/2026 so as duas primeiras existiam aqui, e o CI falhou em
+    # todas as execucoes desde o primeiro commit: os testes recusam rodar sem
+    # `TEST_DATABASE_URL`, e a API recusa subir sem os dois segredos. Na maquina
+    # de desenvolvimento tudo isso vem do `.env`, que fica fora do Git — e por
+    # isso a suite passava la e nunca aqui.
     env:
       DATABASE_URL: mysql://crm:ci_senha@127.0.0.1:3306/crm_ci
       SHADOW_DATABASE_URL: mysql://crm:ci_senha@127.0.0.1:3306/prisma_migrate_shadow_db_diff
+      # Precisa terminar em /crm_test: `banco-de-teste.ts` recusa qualquer
+      # outro nome, para a limpeza entre testes nunca apagar o banco errado.
+      TEST_DATABASE_URL: mysql://crm:ci_senha@127.0.0.1:3306/crm_test
+
+      # Segredos gerados **so para o CI**, e escritos aqui de proposito. Nao
+      # protegem dado nenhum: o banco deste job e descartavel e some ao fim de
+      # cada execucao. Nunca reaproveitar estes valores em outro ambiente, nem
+      # trocar por os de desenvolvimento ou de producao.
+      IP_HASH_SECRET: bb16c2f97259f836834ee1597ae34dec84cba39f56d948125314af607e417234
+      MIDIA_SIGN_SECRET: f64370fee2c338b79cf10fff6f84186d64fa7009a94169955488ac33ba075009
+
+      # Os adaptadores de desenvolvimento. Ja sao o padrao, e ficam explicitos
+      # para o CI nao depender de valor implicito.
+      EMAIL_PROVIDER: log
+      MIDIA_PROVIDER: local
+      MIDIA_DIR: .midia-ci
 
     steps:
       - uses: actions/checkout@v5
@@ -48,12 +69,19 @@ jobs:
 
       # O mesmo GRANT de docker/mysql/init/01-shadow-db.sh. Aqui e explicito
       # porque o servico do GitHub Actions nao executa scripts de init.
-      - name: Permitir shadow database
+      #
+      # O `crm_test` entrou em 29/10/2026: o servico so cria o `crm_ci`, e o
+      # usuario `crm` nao tinha permissao em outro banco. As migrations dele
+      # sao aplicadas pelo proprio Vitest (`test/apoio/setup-global.ts`).
+      - name: Preparar shadow database e banco de teste
         run: |
           mysql -h 127.0.0.1 -u root -pci_root -e "
             GRANT ALL PRIVILEGES ON \`prisma_migrate_shadow_db%\`.* TO 'crm'@'%';
             CREATE DATABASE IF NOT EXISTS \`prisma_migrate_shadow_db_diff\`
               CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+            CREATE DATABASE IF NOT EXISTS \`crm_test\`
+              CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            GRANT ALL PRIVILEGES ON \`crm_test\`.* TO 'crm'@'%';
             FLUSH PRIVILEGES;"
 
       - name: Aplicar migrations
