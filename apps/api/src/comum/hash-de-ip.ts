@@ -51,5 +51,16 @@ export function hashDeIp(ip: string | undefined): string | undefined {
     return undefined;
   }
 
-  return createHmac('sha256', lerSegredo()).update(ip).digest('hex');
+  return hmacDoServidor(ip);
+}
+
+/**
+ * O mesmo HMAC, para qualquer texto que nao deva ser guardado em claro.
+ *
+ * Existe para o limite de tentativas (A11), cuja chave junta IP e e-mail: o
+ * e-mail tem o mesmo problema do IP — o espaco de enderecos de uma lista vazada
+ * e pequeno o bastante para forca bruta sobre um SHA-256 puro.
+ */
+export function hmacDoServidor(texto: string): string {
+  return createHmac('sha256', lerSegredo()).update(texto).digest('hex');
 }

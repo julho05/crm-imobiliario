@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LimiteModule } from '../limite/limite.module';
 import { AutenticacaoController } from './autenticacao.controller';
 import { AutenticacaoService } from './autenticacao.service';
 import { RecuperacaoService } from './recuperacao.service';
@@ -8,6 +9,7 @@ import { SessaoService } from './sessao.service';
 
 // O PrismaService vem do PrismaModule, que e @Global().
 @Module({
+  imports: [LimiteModule],
   controllers: [AutenticacaoController],
   providers: [
     AutenticacaoService,

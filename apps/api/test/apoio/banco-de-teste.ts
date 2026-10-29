@@ -36,6 +36,9 @@ const ORDEM_DE_LIMPEZA = [
   'membership',
   'organization',
   'user',
+  // Sem chave estrangeira; entra no fim. Sem esta linha, o contador de um
+  // caso passaria ao seguinte, e a suite viraria dependente de ordem.
+  'rateLimitHit',
 ] as const;
 
 export function urlDoBancoDeTeste(): string {

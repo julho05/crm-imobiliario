@@ -622,3 +622,28 @@ model Activity {
   @@index([actorMembershipId])
   @@index([actorPlatformAdminId])
 }
+
+// ---------------------------------------------------------------------------
+// Limite de tentativas (item A11)
+// ---------------------------------------------------------------------------
+
+// Um contador por chave e janela de tempo. No MySQL, e nao em memoria, porque
+// a hospedagem nao garante processo unico (architecture.md, 21/10/2026): com
+// contador em memoria, cada processo teria o seu, e o limite real seria o
+// multiplo disso.
+//
+// `key` e um HMAC da regra com o IP e, quando ha, o e-mail — nunca os dois em
+// claro. Esta tabela nao pode virar o registro de quem tentou entrar onde.
+//
+// Sem relacao com nenhuma outra tabela de proposito: e contador descartavel, e
+// `expiresAt` existe para a limpeza que acontece durante o uso, ja que o plano
+// nao permite tarefa agendada.
+model RateLimitHit {
+  key         String   @db.Char(64)
+  windowStart DateTime
+  hits        Int      @default(1)
+  expiresAt   DateTime
+
+  @@id([key, windowStart])
+  @@index([expiresAt])
+}

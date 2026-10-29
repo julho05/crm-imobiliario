@@ -26,6 +26,8 @@ import {
 } from '@app/shared';
 import { ZodValidationPipe } from '../validacao/zod-validation.pipe';
 import { hashDeIp } from '../comum/hash-de-ip';
+import { LimiteDeTentativasService } from '../limite/limite-de-tentativas.service';
+import { LIMITES } from '../limite/regras';
 import { AutenticacaoService } from './autenticacao.service';
 import { RecuperacaoService } from './recuperacao.service';
 import { NOME_DO_COOKIE_DE_SESSAO, opcoesDoCookieDeSessao } from './cookie';
@@ -38,6 +40,14 @@ import { SessaoService } from './sessao.service';
  * Nenhuma resposta devolve o token de sessao no corpo. Ele sai **apenas** no
  * cookie `httpOnly`: token em JSON seria lido por JavaScript da pagina, o que
  * desfaz justamente a protecao que o `httpOnly` existe para dar.
+ *
+ * ## Limite de tentativas (A11)
+ *
+ * Toda rota que atende quem ainda nao tem sessao chama `limite.consumir` como
+ * primeira linha — depois da validacao do corpo, que roda nos pipes, e antes de
+ * qualquer trabalho caro. A chamada fica escrita na rota, e nao escondida numa
+ * guarda, para que a ausencia dela numa rota nova salte aos olhos. Os numeros
+ * estao em `limite/regras.ts`.
  */
 @Controller('autenticacao')
 export class AutenticacaoController {
@@ -47,6 +57,7 @@ export class AutenticacaoController {
     private readonly autenticacao: AutenticacaoService,
     private readonly sessoes: SessaoService,
     private readonly recuperacao: RecuperacaoService,
+    private readonly limite: LimiteDeTentativasService,
   ) {}
 
   @Post('cadastro')
@@ -56,6 +67,11 @@ export class AutenticacaoController {
     @Req() requisicao: Request,
     @Res({ passthrough: true }) resposta: Response,
   ) {
+    await this.limite.consumir({
+      regra: LIMITES.cadastroPorIp,
+      partes: [requisicao.ip],
+    });
+
     const contexto = contextoDaRequisicao(requisicao);
 
     const { userId } = await this.autenticacao.cadastrar(dados, contexto);
@@ -95,6 +111,12 @@ export class AutenticacaoController {
     @Req() requisicao: Request,
     @Res({ passthrough: true }) resposta: Response,
   ) {
+    // Por IP e por IP + e-mail, nunca por e-mail sozinho: ver `regras.ts`.
+    await this.limite.consumir(
+      { regra: LIMITES.loginPorIp, partes: [requisicao.ip] },
+      { regra: LIMITES.loginPorIpEEmail, partes: [requisicao.ip, dados.email] },
+    );
+
     const sessao = await this.autenticacao.entrar(
       dados,
       contextoDaRequisicao(requisicao),
@@ -130,10 +152,19 @@ export class AutenticacaoController {
    */
   @Post('recuperacao')
   @HttpCode(200)
-  solicitarRecuperacao(
+  async solicitarRecuperacao(
     @Body(new ZodValidationPipe(solicitarRecuperacaoSchema))
     dados: EntradaDeSolicitarRecuperacao,
+    @Req() requisicao: Request,
   ) {
+    // O limite por e-mail conta exista a conta ou nao. Contar so as que
+    // existem faria do 429 a resposta que a mensagem igual para todos (acima)
+    // existe para nao dar.
+    await this.limite.consumir(
+      { regra: LIMITES.recuperacaoPorIp, partes: [requisicao.ip] },
+      { regra: LIMITES.recuperacaoPorEmail, partes: [dados.email] },
+    );
+
     return this.recuperacao.solicitarRedefinicao(dados.email);
   }
 
@@ -148,7 +179,13 @@ export class AutenticacaoController {
   async redefinirSenha(
     @Body(new ZodValidationPipe(redefinirSenhaSchema))
     dados: EntradaDeRedefinirSenha,
+    @Req() requisicao: Request,
   ) {
+    await this.limite.consumir({
+      regra: LIMITES.tokenPorIp,
+      partes: [requisicao.ip],
+    });
+
     const { sessoesEncerradas } = await this.recuperacao.redefinirSenha(dados);
 
     return { ok: true, sessoesEncerradas };
@@ -160,7 +197,13 @@ export class AutenticacaoController {
   async verificarEmail(
     @Body(new ZodValidationPipe(tokenDeUsoUnicoSchema))
     dados: EntradaDeTokenDeUsoUnico,
+    @Req() requisicao: Request,
   ) {
+    await this.limite.consumir({
+      regra: LIMITES.tokenPorIp,
+      partes: [requisicao.ip],
+    });
+
     await this.recuperacao.verificarEmail(dados.token);
 
     return { ok: true };

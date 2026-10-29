@@ -68,7 +68,7 @@ Situação em 20/10/2026: **A1 a A10 concluídos.** Verificável com `npm run ve
 
 **A12 e A13 fecharam em 21/10/2026**, junto com o item B1 — e não antes dele por uma razão de método: os dois só existem de verdade contra endpoint de recurso. Até ali, o que havia era a guarda provada por rotas que existiam somente no teste, o que demonstra que o mecanismo funciona mas não que a rota de produção se lembra de chamá-lo. Ver `apps/api/test/imoveis/isolamento.http.spec.ts`.
 
-Em aberto: **A11**, que depende da decisão de rate limiting.
+**A11 fechou em 29/10/2026** — ver a seção dele abaixo da tabela. Com ele, a Fase 1 está completa.
 
 **Limitação conhecida do A9.** As respostas são idênticas em status e corpo, mas o *tempo* de resposta não é: quando a conta existe, há escrita no banco e envio de e-mail. Com o adaptador de log a diferença é desprezível; com um provedor real, a latência da chamada tornaria a existência da conta observável por cronômetro. A correção é enviar fora do caminho da requisição, e ela entra junto com a escolha do provedor.
 
@@ -88,13 +88,39 @@ Depende de: 1.1 concluído · decisão de domínio único ou separado · serviç
 | A8 | Verificação de e-mail | Token com **hash** no banco, expiração e uso único; reutilizar o token falha | A2 |
 | A9 | Recuperação de senha | Resposta idêntica exista o e-mail ou não; token de uso único; redefinir **encerra as outras sessões** do usuário | A2, A3 |
 | A10 | Convites | `OWNER`/`ADMIN`/`MANAGER` convidam conforme a hierarquia; `OWNER` não é convidável; token com hash e expiração; aceitar cria `Membership` | A5 |
-| A11 | Rate limiting | Login, recuperação e captura de lead limitados por IP; teste confirma bloqueio após N tentativas | A4 |
+| A11 | Rate limiting — *concluído em 29/10/2026; a captura de lead recebe o limite junto com o C5* | Login, recuperação e captura de lead limitados por IP; teste confirma bloqueio após N tentativas | A4 |
 | A12 | **Testes de isolamento multi-tenant** — *concluído em 21/10/2026* | Os cenários de [permissions.md](permissions.md) §8 passando: travessia entre organizações devolve **404 e nunca 403**, escopo `OWN` respeitado, organização ativa não é manipulável pelo cliente | A5, A6, A7 |
 | A13 | Auditoria de escrita — *concluído em 21/10/2026* | Toda escrita gera `Activity`; nenhum endpoint permite editar o log | A5 |
 
 **A12 é o critério de saída da Fase 1.** Sem ele, nada do que vem depois pode ser considerado seguro: é o teste que prova que uma organização não vê dados de outra.
 
-**Fechado em 21/10/2026.** A Fase 1 tem um único item em aberto, o A11, e ele não bloqueia a Fase 2.
+**Fechado em 21/10/2026**, com o A11 em aberto; **completo em 29/10/2026**, quando o A11 entrou.
+
+### Limite de tentativas — **A11 concluído em 29/10/2026**
+
+Tabela `RateLimitHit` (migration `20261029120000_limite_de_tentativas`), serviço em `apps/api/src/limite/` e **14 testes** em `test/limite/limite.http.spec.ts`. Quem passa do limite recebe **429** com `Retry-After` e mensagem em português, que a tela de login já mostrava sem mudança.
+
+| Rota | Por IP | Outra chave |
+|---|---|---|
+| Login | 100 / 15 min | **IP + e-mail**: 10 / 15 min |
+| Recuperação de senha | 10 / hora | e-mail: 3 / hora |
+| Cadastro | 10 / hora | — |
+| Redefinir senha, verificar e-mail, ver/aceitar/vincular convite | 30 / 15 min, um contador para todas | — |
+
+Decisões tomadas, a não reabrir sem motivo:
+
+- **No MySQL**, como decidido em 21/10/2026: sem garantia de processo único, contador em memória daria um limite por processo. O incremento é atômico (`INSERT … ON DUPLICATE KEY UPDATE`), e o teste com 45 requisições simultâneas confirma que nenhuma passa do máximo
+- **Login por IP + e-mail, nunca por e-mail sozinho** (decisão do responsável, 29/10/2026). Por e-mail sozinho, qualquer pessoa tiraria um corretor do sistema errando a senha dele dez vezes. O ataque distribuído contra uma conta fica com o Argon2 e a política de senha; se aparecer de verdade, a resposta é verificação extra para aquela conta, não bloqueio
+- **Conta-se toda tentativa**, não só a que falha: contar só a falha exigiria rodar o Argon2 antes de contar, que é o trabalho que o limite existe para poupar
+- **A recuperação conta por e-mail exista a conta ou não.** Contar só as que existem faria do 429 a resposta que a mensagem idêntica do A9 existe para não dar
+- **Nem IP nem e-mail em claro na tabela**: a chave é um HMAC com o mesmo segredo do hash de IP, com teste
+- **Chamada explícita no controller**, depois da validação, e não guarda: a guarda rodaria antes do corpo validado, e a chamada escrita na rota torna visível a rota nova que a esqueceu
+- **Janela fixa**, aceitando que quem conhece a regra consiga o dobro do máximo na virada da janela. Contra um Argon2, vinte tentativas continuam sendo nada
+- **Limpeza durante o uso**, em lote, em uma a cada cinquenta chamadas: o plano não permite tarefa agendada
+
+**Risco que passa para a Fase 4 (D1), obrigatório:** o limite depende de `req.ip`, e `req.ip` depende de `TRUST_PROXY_HOPS`. Saltos de menos põem todos os visitantes atrás do IP do proxy, e eles se bloqueiam juntos; saltos de mais, ou nenhum proxy na frente, deixam qualquer um forjar `X-Forwarded-For` e escapar do limite. Conferir contra a hospedagem real antes do piloto.
+
+**Incidente na criação da migration**, para quem for criar a próxima: o `prisma migrate dev` travou sem saída neste ambiente, esperando interação que o terminal não oferece, e um processo interrompido continuou vivo e criou uma pasta duplicada. A migration foi gerada com `prisma migrate diff --from-config-datasource --to-schema` e aplicada com `migrate deploy`; a duplicata foi marcada com `migrate resolve --rolled-back` e removida. O banco de teste e a produção não foram tocados.
 
 ---
 

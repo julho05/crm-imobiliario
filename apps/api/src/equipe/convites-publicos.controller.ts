@@ -18,6 +18,8 @@ import {
 } from '@app/shared';
 import { ZodValidationPipe } from '../validacao/zod-validation.pipe';
 import { hashDeIp } from '../comum/hash-de-ip';
+import { LimiteDeTentativasService } from '../limite/limite-de-tentativas.service';
+import { LIMITES } from '../limite/regras';
 import {
   NOME_DO_COOKIE_DE_SESSAO,
   opcoesDoCookieDeSessao,
@@ -46,14 +48,25 @@ import { ConvitesService } from './convites.service';
  * Uma rota so que decidisse pelo estado da sessao teria de aceitar `nome` e
  * `senha` opcionais, e um corpo opcional em fluxo de criacao de conta e onde
  * mora o erro que ninguem ve.
+ *
+ * As tres rotas recebem token e dividem o mesmo contador por IP (A11): quem
+ * tenta adivinhar token nao escolhe uma rota so.
  */
 @Controller('convites')
 export class ConvitesPublicosController {
-  constructor(private readonly convites: ConvitesService) {}
+  constructor(
+    private readonly convites: ConvitesService,
+    private readonly limite: LimiteDeTentativasService,
+  ) {}
 
   /** Dados do convite, para a tela decidir qual formulario mostrar. */
   @Get(':token')
-  ver(@Param('token') token: string) {
+  async ver(@Param('token') token: string, @Req() requisicao: Request) {
+    await this.limite.consumir({
+      regra: LIMITES.tokenPorIp,
+      partes: [requisicao.ip],
+    });
+
     return this.convites.ver(token);
   }
 
@@ -65,6 +78,11 @@ export class ConvitesPublicosController {
     @Req() requisicao: Request,
     @Res({ passthrough: true }) resposta: Response,
   ) {
+    await this.limite.consumir({
+      regra: LIMITES.tokenPorIp,
+      partes: [requisicao.ip],
+    });
+
     const sessao = await this.convites.aceitarCriandoConta(dados, {
       ipHash: hashDeIp(requisicao.ip),
       userAgent: requisicao.headers['user-agent'],
@@ -89,6 +107,11 @@ export class ConvitesPublicosController {
     dados: EntradaDeTokenDeUsoUnico,
     @Req() requisicao: RequisicaoAutenticada,
   ) {
+    await this.limite.consumir({
+      regra: LIMITES.tokenPorIp,
+      partes: [requisicao.ip],
+    });
+
     const { organizationId } = await this.convites.aceitarComContaExistente(
       requisicao.sessao.userId,
       dados.token,

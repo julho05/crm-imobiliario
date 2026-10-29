@@ -256,6 +256,13 @@ A implementação vai sobre o MySQL, que funciona com um processo ou com vinte.
 Custa um pouco mais de trabalho e remove uma pendência — o A11 deixou de
 depender de resposta sobre infraestrutura.
 
+**Implementado em 29/10/2026**: tabela `RateLimitHit`, janela fixa, incremento
+atômico e limpeza durante o uso. Detalhes e números em `roadmap.md`, item A11.
+A consequência de infraestrutura é o `TRUST_PROXY_HOPS`: errado para menos,
+todos os visitantes dividem o IP do proxy e se bloqueiam juntos; errado para
+mais, qualquer um escapa do limite forjando `X-Forwarded-For`. Entra no
+checklist da hospedagem (D1).
+
 ### Orçamento, para não ser surpresa
 
 O preço promocional do Unlimited é R$ 12,99/mês **com 48 meses pagos de uma

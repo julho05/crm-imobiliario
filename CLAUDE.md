@@ -20,7 +20,7 @@ Em 20/10/2026 entraram as **primeiras telas**: `/cadastro`, `/entrar`, `/recuper
 
 Em 21/10/2026 entrou o **B1** (CRUD de imóveis), e com ele fecharam o **A12** e o **A13** — nessa ordem por necessidade, não por escolha: os dois só existem de verdade contra endpoint de recurso. Até ali a guarda estava provada por rotas que existiam somente no teste, o que mostra que o mecanismo funciona mas não que a rota de produção se lembra de chamá-lo. Agora `apps/api/test/imoveis/isolamento.http.spec.ts` faz as perguntas do `docs/permissions.md` §8.2, §8.3 e §8.4 contra `/api/imoveis`, a rota que o site usa. São **401 testes** em `npm run verify`.
 
-**A Fase 1 está fechada**, com um único item em aberto: o **A11** (rate limiting), que depende de decisão sua — dependência nova ou implementação sobre o MySQL, e a escolha muda se a hospedagem rodar mais de um processo. Ele não bloqueia a Fase 2.
+**A Fase 1 está completa desde 29/10/2026**, quando entrou o **A11** (rate limiting) — ver o parágrafo daquela data, mais abaixo.
 
 Em 21/10/2026, ainda no mesmo dia, entraram o **B2** (publicação) e as **telas de imóveis**: layout do painel com navegação por papel e seletor de organização, lista com filtros e paginação, formulário de cadastro e edição em cinco seções, publicar/tirar do ar e exclusão com confirmação. São **421 testes** na API.
 
@@ -132,6 +132,16 @@ Três decisões a não reabrir:
 - **Preço exige comprar ou alugar**, e o imóvel `BOTH` aparece nas duas buscas, comparado pelo preço da finalidade pedida
 - **Mínimo zero é ignorado** e todo mínimo maior que zero exclui o imóvel sem o valor — a consequência da decisão de 21/10/2026 sobre campos opcionais
 - **Parâmetro desconhecido é ignorado, não recusado**, e campo em branco vale como ausente: link compartilhado chega com `fbclid`, e formulário GET manda `?precoMinimo=`
+
+Em 29/10/2026 entrou o **A11** — limite de tentativas —, e com ele a Fase 1 ficou completa. São **824 testes**, e a primeira migration desde a fundação (`20261029120000_limite_de_tentativas`, tabela `RateLimitHit`).
+
+Login, recuperação, cadastro e as rotas de token respondem **429 com `Retry-After`**. Os números estão todos em `apps/api/src/limite/regras.ts`. A captura de lead recebe o limite junto com o C5. Três decisões a não reabrir:
+
+- **Login por IP + e-mail, nunca por e-mail sozinho** (decisão do responsável): por e-mail sozinho, qualquer pessoa trancaria um corretor fora do sistema errando a senha dele dez vezes
+- **Contador no MySQL, incremento atômico**, com teste de requisições simultâneas — sem garantia de processo único, contador em memória não vale
+- **A chamada fica escrita no controller**, como primeira linha da rota pública, e não numa guarda. Rota pública nova sem `limite.consumir` deve chamar atenção na revisão
+
+**Pendência obrigatória para a Fase 4:** conferir `TRUST_PROXY_HOPS` contra a hospedagem. Errado para menos, todos dividem o IP do proxy e se bloqueiam juntos; errado para mais, qualquer um escapa forjando `X-Forwarded-For`.
 
 Verificação de 360px sem ferramenta de navegador: o Edge headless tem largura mínima de janela acima de 360px e **recorta** a captura, parecendo transbordamento. Carregar a página dentro de um `<iframe>` de 360px dá a medida real.
 
@@ -274,6 +284,7 @@ Armadilhas confirmadas na prática:
 - O ESLint deste projeto **recusa `setState` síncrono no corpo de um `useEffect`** (`react-hooks/set-state-in-effect`), e com razão: provoca renderização em cascata. O caso típico é marcar "carregando" antes de buscar. A saída não é contornar a regra — é ligar o sinalizador em **quem dispara** a busca, e desligá-lo dentro da função assíncrona, depois do `await`.
 - **`as const` num `select` do Prisma 7 quebra a inferência de relação aninhada.** O objeto fica `readonly` e o tipo do resultado perde a relação incluída — no caso, o `ownerMember` desaparecia do retorno. O erro aparece longe da causa, na função que consome o registro, reclamando de propriedade que falta. Usar `satisfies Prisma.<Modelo>Select`, que preserva os tipos literais sem tornar o objeto somente-leitura.
 - O `apps/api/test/` estava **fora** do `tsconfig.json` (que inclui só `src/**/*`), então `tsc --noEmit` nunca o verificava. Pior: o transformador do Vitest procura o `tsconfig.json` mais próximo do arquivo para saber de `experimentalDecorators`, e sem nenhum ali um controller de teste com `@Req()` falhava com "Decorators are not valid here" — erro que aparece como falha de suite, não de configuração. Resolvido com `apps/api/test/tsconfig.json`, que **precisa** ter esse nome exato, e que declara `module: esnext` porque quem carrega esses arquivos é o Vitest, como ESM, e não o `tsc` para CommonJS.
+- **`prisma migrate dev` trava sem saída quando roda sem terminal interativo** (caso do assistente, em 29/10/2026), e interromper o shell **não** mata o processo do Node: ele continuou vivo, criou uma pasta de migration duplicada e a deixou para o `deploy` seguinte aplicar duas vezes. Fora de terminal interativo, gerar com `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script -o <pasta>/migration.sql` e aplicar com `prisma migrate deploy`. Conferir depois com `migrate status` e o `db:drift`.
 
 ## Situação das dez entregas do briefing inicial
 | # | Entrega | Situação |

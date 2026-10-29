@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import { FiltroDeLimiteAtingido } from './limite/limite-atingido';
 
 /**
  * Configuracao da aplicacao, compartilhada entre `main.ts` e os testes de HTTP.
@@ -26,8 +27,16 @@ export function configurarApp(app: INestApplication): void {
   // Confia no proxy para ler o IP real do cliente. Sem isto, req.ip devolve o
   // endereco do proxy e o hash de IP registrado perde sentido. O numero de
   // saltos precisa ser conferido contra a hospedagem na Fase 4.
+  //
+  // Desde o A11 isto tambem decide o limite de tentativas, e erra dos dois
+  // lados: com saltos de menos, todo visitante aparece com o IP do proxy e
+  // todos se bloqueiam juntos; com saltos de mais — ou sem proxy na frente —,
+  // qualquer um forja `X-Forwarded-For` e escapa do limite.
   app
     .getHttpAdapter()
     .getInstance()
     .set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
+
+  // 429 com `Retry-After` (A11). A excecao HTTP do Nest nao carrega cabecalho.
+  app.useGlobalFilters(new FiltroDeLimiteAtingido());
 }
