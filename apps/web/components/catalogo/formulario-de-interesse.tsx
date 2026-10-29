@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AVISO_DE_PRIVACIDADE, capturaDeLeadSchema } from '@app/shared';
 import { Aviso } from '@/components/aviso';
@@ -55,12 +55,46 @@ export function FormularioDeInteresse({
   const [falha, setFalha] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
+  const [ficha, setFicha] = useState<string | null>(null);
+  /**
+   * Vira `true` quando o React já assumiu o formulário. Até lá o botão fica
+   * desabilitado — ver a nota sobre o envio nativo no `<form>`.
+   */
+  const [pronto, setPronto] = useState(false);
+
+  // A ficha anti-spam (C6) é pedida quando o formulário aparece: é a hora
+  // dela que conta como início do preenchimento. `pronto` liga mesmo se ela
+  // não vier — o envio sem ficha pede uma nova, em vez de travar o botão.
+  useEffect(() => {
+    let ativo = true;
+
+    pedirFicha(slug).then((emitida) => {
+      if (ativo) {
+        setFicha(emitida);
+        setPronto(true);
+      }
+    });
+
+    return () => {
+      ativo = false;
+    };
+  }, [slug]);
 
   async function enviar(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setFalha(null);
 
     const dados = new FormData(evento.currentTarget);
+
+    if (!ficha) {
+      // A ficha não chegou (rede caiu ao carregar). Pede agora; o tempo dela
+      // começa a contar aqui, então o envio imediato seria recusado de
+      // qualquer jeito.
+      setFicha(await pedirFicha(slug));
+      setFalha('Aguarde um instante e envie de novo.');
+      return;
+    }
+
     const texto = (campo: string) =>
       String(dados.get(campo) ?? '').trim() || undefined;
 
@@ -71,6 +105,8 @@ export function FormularioDeInteresse({
       email: texto('email'),
       mensagem: texto('mensagem'),
       consentiuComAPrivacidade: dados.get('consentiuComAPrivacidade') === 'on',
+      ficha,
+      site: texto('site'),
     });
 
     if (!validacao.ok) {
@@ -110,15 +146,49 @@ export function FormularioDeInteresse({
     );
   }
 
+  // ## O envio nativo, antes de o JavaScript carregar
+  //
+  // Encontrado em 29/10/2026, no C6: até o React assumir a página, um clique
+  // em "Enviar" fazia o navegador enviar o formulário sozinho — por GET, que é
+  // o padrão, com nome e telefone na URL. A URL vai para o histórico, para o
+  // log do servidor e para o `Referer` da próxima página. No 4G do visitante,
+  // essa janela dura segundos.
+  //
+  // Duas defesas, porque cada uma sozinha tem furo: o botão nasce desabilitado
+  // (o que também bloqueia o Enter num campo), e `method="post"` garante que,
+  // se algo ainda disparar o envio nativo, os dados vão no corpo e não na URL.
   return (
     <form
       ref={formulario}
       onSubmit={enviar}
+      method="post"
       className="grid gap-3"
       noValidate
       aria-label="Mensagem sobre este imóvel"
     >
       {falha ? <Aviso tom="erro">{falha}</Aviso> : null}
+
+      {/*
+        O campo-armadilha (C6). Fora da tela, e não `type="hidden"` nem
+        `display: none`: robô que lê o HTML pula esses dois, e o que se quer é
+        que ele preencha. `aria-hidden` e `tabIndex={-1}` o tiram do leitor de
+        tela e do Tab, e `autoComplete="off"` do preenchimento automático —
+        senão o navegador de uma pessoa de verdade o preencheria por ela, e o
+        lead seria descartado em silêncio.
+      */}
+      <div
+        aria-hidden="true"
+        className="absolute -left-[9999px] h-px w-px overflow-hidden"
+      >
+        <label htmlFor="site">Deixe este campo em branco</label>
+        <input
+          id="site"
+          name="site"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+        />
+      </div>
 
       <Campo
         nome="nomeCompleto"
@@ -200,7 +270,7 @@ export function FormularioDeInteresse({
         </div>
       </div>
 
-      <Button type="submit" disabled={enviando}>
+      <Button type="submit" disabled={!pronto || enviando}>
         {enviando ? 'Enviando...' : 'Enviar mensagem'}
       </Button>
 
@@ -209,4 +279,16 @@ export function FormularioDeInteresse({
       </p>
     </form>
   );
+}
+
+/** A ficha anti-spam, ou `null` se a API não respondeu. */
+async function pedirFicha(slug: string): Promise<string | null> {
+  try {
+    const { ficha } = await chamarApi<{ ficha: string }>(
+      `/publico/organizacoes/${slug}/interesse/ficha`,
+    );
+    return ficha;
+  } catch {
+    return null;
+  }
 }

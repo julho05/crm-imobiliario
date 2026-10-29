@@ -345,7 +345,7 @@ Ficou invisível por um dia porque **teste de isolamento testa o que não deve a
 
 ## Fase 3: catálogo público
 
-Depende de: B1 a B4 · mecanismo anti-spam decidido · texto do aviso de privacidade.
+Depende de: B1 a B4 · ~~mecanismo anti-spam decidido~~ (C6, 29/10/2026) · texto do aviso de privacidade (o C5 está pronto, mas travado em produção até ele).
 
 | # | Tarefa | Critério de aceitação verificável | Depende de |
 |---|---|---|---|
@@ -354,7 +354,7 @@ Depende de: B1 a B4 · mecanismo anti-spam decidido · texto do aviso de privaci
 | C3 | Redirecionamento de slug | Slug antigo responde 301 para o novo; adotar slug que ainda redireciona é recusado | A2 |
 | C4 | Busca e filtros — *concluído em 29/10/2026* | Filtros de `filtrosDoCatalogoSchema`; teste confirma que **não** há filtro por rua, CEP ou coordenada | C2 |
 | C5 | Captura de lead — *concluído em 29/10/2026, com o aviso em rascunho e travado em produção* | Consentimento explícito obrigatório; grava versão do aviso e **hash** do IP; resposta não devolve IDs internos; lead vai ao responsável do imóvel ou à fila | B5, C1 |
-| C6 | Anti-spam | Limite por IP comprovado em teste; mecanismo escolhido registrado em `docs/` | C5 |
+| C6 | Anti-spam — *concluído em 29/10/2026* | Limite por IP comprovado em teste; mecanismo escolhido registrado em `docs/` | C5 |
 | C7 | SEO e responsividade | Título, descrição e dados estruturados por imóvel; páginas utilizáveis em tela de 360px | C1 |
 
 ### API pública — **C2 concluído em 23/10/2026, e com ele o B3**
@@ -441,6 +441,23 @@ Verificado contra o servidor em execução, pelo proxy do site: o anúncio mostr
 
 **Pendente:** o texto final do aviso (D6). A seção "Para quem tem conta no sistema" de `/privacidade` também está por redigir — o cadastro linka para a mesma página.
 
+### Anti-spam — **C6 concluído em 29/10/2026**
+
+Mecanismo escolhido pelo responsável: **campo-armadilha e tempo mínimo**, somados ao limite por IP do C5 — o critério "limite por IP comprovado em teste" já era cumprido ali. Nenhum dado do visitante vai a terceiro. São **13 testes novos** em `test/catalogo/anti-spam.http.spec.ts`.
+
+**O tempo mínimo só vale porque a hora é do servidor.** `GET .../interesse/ficha` devolve `<emitidaEm>.<hmac>`, assinada com o segredo do servidor e ligada ao slug da vitrine (`apps/api/src/catalogo/ficha-do-formulario.ts`); o envio a devolve, e a API confere assinatura, idade mínima de 2 segundos e máxima de 24 horas. Se o formulário dissesse ele mesmo quando abriu, o robô diria o mesmo. Testado contra fichas fabricadas — sem assinatura, assinatura inventada, hora reescrita com assinatura de outra ficha, ficha de outra vitrine — e por mutação: com a conferência da assinatura desligada, quatro casos quebram.
+
+Decisões tomadas durante a implementação:
+
+- **Campo-armadilha preenchido responde 201, igual ao aceito, e não grava nada.** Um 400 diria ao robô qual campo evitar. O log registra o descarte sem dado do envio
+- **Envio cedo demais responde 400 visível** ("aguarde um instante e envie de novo"), e não descarte silencioso: o preenchimento automático do navegador é rápido, e lead real descartado sem aviso é irrecuperável
+- **A rota da ficha não tem `limite.consumir`**, e a ausência está escrita no controller: ela não toca o banco, e limitá-la custaria uma escrita no MySQL por visita ao anúncio
+- **A armadilha fica fora da tela**, não em `type="hidden"` nem `display: none` — robô pula esses —, com `aria-hidden`, `tabIndex={-1}` e `autoComplete="off"`
+
+**Um defeito do C5 apareceu na verificação pelo navegador, e foi corrigido.** Até o React assumir a página, um clique em "Enviar" fazia o navegador enviar o formulário sozinho, por GET: nome e telefone iam para a URL — histórico, log do servidor, `Referer`. No 4G do visitante a janela dura segundos. Nenhum teste da API pegaria isso, porque a API nunca recebe a requisição. Agora o botão nasce desabilitado e só habilita com a ficha em mãos, e o formulário declara `method="post"`. Verificado com a página sem JavaScript: o clique não faz nada e a URL fica limpa.
+
+Verificado no navegador, com JavaScript: a pessoa que espera envia; o robô que preenche a armadilha vê a mesma confirmação e não vira lead; o clique imediato não faz nada, e o seguinte passa.
+
 ---
 
 ## Fase 4: piloto e lançamento
@@ -474,7 +491,7 @@ Um corretor entra, cadastra e publica imóvel, recebe lead do catálogo, agenda 
 | ~~Armazenamento de objetos~~ | ~~B4~~ | **Decidido em 21/10/2026: Cloudflare R2.** Gratuito até 10 GB; a Hostinger não oferece o serviço. Ver `architecture.md` |
 | ~~Campos obrigatórios do imóvel~~ | ~~B1~~ | **Decidido em 21/10/2026**: piso do banco mais preço coerente com a finalidade. Ver `packages/shared/src/schemas/imovel.ts` |
 | Unificar leads duplicados no MVP | B5 | Responsável |
-| Mecanismo anti-spam | C6 | Responsável (custo e LGPD) |
+| ~~Mecanismo anti-spam~~ — *decidido em 29/10/2026: campo-armadilha e tempo mínimo* | C6 | Responsável (custo e LGPD) |
 | ~~Código do imóvel no slug público~~ | ~~Coerência entre B1 e C2~~ | **Decidido em 29/10/2026: o código é público.** Ver `data-model.md` §5 |
 | Parecer jurídico sobre anonimização | D6, piloto | Advogado — **não é decisão técnica** |
 | Marca verificada no INPI e Registro.br | Qualquer uso público | Responsável |

@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
+  Logger,
   Param,
   Post,
   Query,
@@ -23,6 +25,7 @@ import { ZodValidationPipe } from '../validacao/zod-validation.pipe';
 import { LimiteDeTentativasService } from '../limite/limite-de-tentativas.service';
 import { LIMITES } from '../limite/regras';
 import { CatalogoService } from './catalogo.service';
+import { conferirFicha, emitirFicha } from './ficha-do-formulario';
 
 /**
  * O catálogo público — item **C2**.
@@ -48,6 +51,8 @@ import { CatalogoService } from './catalogo.service';
  */
 @Controller('publico/organizacoes/:slug')
 export class CatalogoController {
+  private readonly logger = new Logger(CatalogoController.name);
+
   constructor(
     private readonly catalogo: CatalogoService,
     private readonly limite: LimiteDeTentativasService,
@@ -92,6 +97,24 @@ export class CatalogoController {
   }
 
   /**
+   * A ficha anti-spam do formulário de interesse — item **C6**. Ver
+   * `ficha-do-formulario.ts`.
+   *
+   * **Sem `limite.consumir`, e a ausência é deliberada** (a regra do A11 pede
+   * que ela salte aos olhos, e por isso está escrita): a rota não lê nem
+   * escreve no banco, só assina a hora. Contar cada abertura de anúncio
+   * custaria uma escrita no MySQL por visita, para proteger uma resposta que
+   * não custa nada. O limite fica no envio, que é onde o dano acontece.
+   *
+   * Não confere se o slug existe pelo mesmo motivo: a ficha de um slug
+   * inexistente só serve para um envio que vai receber 404.
+   */
+  @Get('interesse/ficha')
+  ficha(@Param('slug') slug: string) {
+    return { ficha: emitirFicha(slug) };
+  }
+
+  /**
    * O formulário de interesse — item **C5**. A única escrita do catálogo.
    *
    * Duas recusas antes de qualquer trabalho, e nesta ordem:
@@ -107,6 +130,21 @@ export class CatalogoController {
    * A resposta não devolve id nenhum, nem do lead nem do imóvel: o visitante
    * não tem o que fazer com eles, e cada id a mais é um identificador interno
    * circulando fora (`permissions.md` §5).
+   *
+   * ## Anti-spam (C6), depois do limite
+   *
+   * Depois, para o robô gastar o limite dele também.
+   *
+   * - **Campo-armadilha preenchido: 201 sem gravar nada.** A resposta é igual
+   *   à do envio aceito. Um 400 diria ao robô qual campo deixar em branco, e
+   *   nenhuma pessoa preenche um campo que não vê
+   * - **Ficha antiga demais, adulterada ou de outra vitrine: 400**, com a
+   *   mensagem de recarregar a página. É o que a pessoa com a página aberta
+   *   desde ontem precisa ler
+   * - **Ficha com menos de dois segundos: 400**, pedindo para enviar de novo.
+   *   Recusa visível, e não descarte silencioso: o preenchimento automático
+   *   do navegador é rápido, e lead de verdade jogado fora sem aviso não tem
+   *   como ser recuperado. Quem reenvia passa, porque o tempo já correu
    */
   @Post('interesse')
   @HttpCode(201)
@@ -127,6 +165,28 @@ export class CatalogoController {
       regra: LIMITES.capturaPorIp,
       partes: [requisicao.ip],
     });
+
+    if (dados.site) {
+      // Sem dado do envio no log: o nome e o telefone podem ser de uma pessoa
+      // real que o robô copiou de algum lugar.
+      this.logger.warn(`Envio descartado na vitrine ${slug}: campo-armadilha`);
+      return { recebido: true };
+    }
+
+    const ficha = conferirFicha(slug, dados.ficha);
+
+    if (ficha === 'invalida') {
+      throw new BadRequestException({
+        mensagem:
+          'Este formulario expirou. Recarregue a pagina e envie de novo.',
+      });
+    }
+
+    if (ficha === 'cedo') {
+      throw new BadRequestException({
+        mensagem: 'Aguarde um instante e envie de novo.',
+      });
+    }
 
     await this.catalogo.registrarInteresse(slug, dados, requisicao.ip);
 

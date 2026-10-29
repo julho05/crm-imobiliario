@@ -46,6 +46,23 @@ export const capturaDeLeadSchema = z
       true,
       'E preciso concordar com o aviso de privacidade para enviar.',
     ),
+    /**
+     * Anti-spam (C6): a ficha que a API emitiu quando o formulario carregou.
+     * Prova, pela assinatura do servidor, quando o preenchimento comecou. O
+     * conteudo e conferido no servidor, e nao aqui: o schema roda tambem no
+     * navegador, que nao tem o segredo.
+     */
+    ficha: z
+      .string()
+      .min(1, 'Recarregue a pagina e envie de novo.')
+      .max(200, 'Recarregue a pagina e envie de novo.'),
+    /**
+     * Anti-spam (C6): o campo-armadilha. Invisivel para pessoas, e por isso
+     * sempre vazio quando quem envia e uma. Opcional e sem regra de conteudo
+     * de proposito: recusar aqui, com 400, ensinaria ao robo qual campo evitar.
+     * O servidor descarta o envio em silencio.
+     */
+    site: z.string().max(500).optional(),
   })
   .refine((v) => Boolean(v.telefone ?? v.email), {
     message: 'Informe ao menos um telefone ou um e-mail para contato.',

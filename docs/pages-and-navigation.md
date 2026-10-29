@@ -325,7 +325,7 @@ A resposta confirma o envio e **não devolve** dados do lead nem IDs internos. E
 
 **[DECIDIDO 29/10/2026, item C5]** O formulário fica na coluna lateral do anúncio, com o contato da organização abaixo dele. Enquanto o aviso de privacidade for rascunho (`AVISO_DE_PRIVACIDADE.rascunho`), ele não aparece em produção e a API responde 503 — o anúncio volta a mostrar só o contato, como no C1. A resposta de sucesso substitui o formulário na própria página.
 
-**[DECIDIR]** Qual mecanismo anti-spam? Captcha de terceiro envolve custo e dado pessoal indo para fora; alternativas (campo-armadilha, limite por IP, prova de trabalho) são mais fracas mas não vazam nada. Não decido isso sozinho.
+~~**[DECIDIR]** Qual mecanismo anti-spam?~~ **[DECIDIDO 29/10/2026 pelo responsável, item C6]** Campo-armadilha, tempo mínimo de preenchimento medido por ficha assinada pelo servidor, e o limite por IP do C5. Nenhum dado do visitante vai a terceiro, e o aviso de privacidade não precisa mencionar o mecanismo. Captcha de terceiro fica para se o spam aparecer no piloto, somado a estes e não no lugar deles.
 
 ---
 

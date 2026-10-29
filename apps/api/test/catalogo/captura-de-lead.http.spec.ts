@@ -14,6 +14,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AVISO_DE_PRIVACIDADE } from '@app/shared';
 import type { PrismaClient, Prisma } from '../../src/generated/prisma/client';
 import { hashDeIp } from '../../src/comum/hash-de-ip';
+import { emitirFicha } from '../../src/catalogo/ficha-do-formulario';
 import { LIMITES } from '../../src/limite/regras';
 import { criarClienteDeTeste, limparBanco } from '../apoio/banco-de-teste';
 import { subirAppDeTeste, type AppDeTeste } from '../apoio/app-de-teste';
@@ -68,6 +69,9 @@ function corpoValido(propertyId: string, extra: Record<string, unknown> = {}) {
     email: 'visitante@exemplo.com',
     mensagem: 'Ainda esta disponivel?',
     consentiuComAPrivacidade: true,
+    // A ficha anti-spam do C6, emitida "há três segundos" para passar do tempo
+    // mínimo. Os casos da ficha em si estão em `anti-spam.http.spec.ts`.
+    ficha: emitirFicha('org-a', Date.now() - 3_000),
     ...extra,
   };
 }

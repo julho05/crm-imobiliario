@@ -82,6 +82,9 @@ describe('ZodValidationPipe', () => {
         nomeCompleto: 'João da Silva',
         telefone: '11988887777',
         consentiuComAPrivacidade: false,
+        // Presente para que a recusa seja pelo consentimento, e não pela
+        // falta da ficha anti-spam (C6).
+        ficha: 'ficha-qualquer',
       }),
     ).toThrow(BadRequestException);
   });
@@ -94,6 +97,7 @@ describe('ZodValidationPipe', () => {
         propertyId: ID_VALIDO,
         nomeCompleto: 'João da Silva',
         consentiuComAPrivacidade: true,
+        ficha: 'ficha-qualquer',
       });
       expect.unreachable('deveria ter lançado');
     } catch (erro) {
