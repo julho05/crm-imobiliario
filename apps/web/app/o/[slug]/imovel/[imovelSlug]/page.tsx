@@ -76,7 +76,7 @@ export default async function Anuncio({ params }: Props) {
           <article className="min-w-0">
             <p className="text-muted-foreground text-sm">
               {ROTULOS_DE_TIPO_DE_IMOVEL[imovel.tipo]} ·{' '}
-              {ROTULOS_DE_FINALIDADE[imovel.finalidade]}
+              {ROTULOS_DE_FINALIDADE[imovel.finalidade]} · Cód. {imovel.codigo}
             </p>
 
             <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -150,7 +150,8 @@ export default async function Anuncio({ params }: Props) {
               <div className="bg-card rounded-lg border p-4">
                 <h2 className="mb-1 font-semibold">Gostou deste imóvel?</h2>
                 <p className="text-muted-foreground mb-3 text-sm">
-                  Fale com {organizacao.nome}.
+                  Fale com {organizacao.nome} e informe o código{' '}
+                  <strong className="text-foreground">{imovel.codigo}</strong>.
                 </p>
                 <ContatoDaOrganizacao organizacao={organizacao} />
               </div>

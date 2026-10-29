@@ -12,9 +12,10 @@ import type {
  *
  * ## Os tipos espelham `apps/api/src/catalogo/resposta-publica.ts`
  *
- * E não `lib/imoveis.ts`. O imóvel do CRM tem `codigo`, `cep`, a rua solta e o
- * responsável; o daqui não tem nenhum deles, e a ausência é a proteção: uma
- * tela da vitrine que tentasse mostrar o código do imóvel não compila. Partir
+ * E não `lib/imoveis.ts`. O imóvel do CRM tem `cep`, a rua solta, a
+ * visibilidade do endereço e o responsável; o daqui não tem nenhum deles, e a
+ * ausência é a proteção: uma tela da vitrine que tentasse mostrar o CEP não
+ * compila. Partir
  * do tipo do CRM e tirar campos seria a lista negra que o `permissions.md` §5
  * proíbe, escrita do lado do site.
  *
@@ -45,6 +46,8 @@ export type EnderecoPublico = {
 
 export type ImovelPublico = {
   id: string;
+  /** Público desde 29/10/2026: é o que o cliente cita no WhatsApp. */
+  codigo: string;
   slug: string;
   titulo: string;
   descricao: string | null;

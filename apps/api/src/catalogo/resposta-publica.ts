@@ -56,9 +56,17 @@ import type { Prisma } from '../generated/prisma/client';
  * `street`, `number` e `complement` são **condicionais**: entram conforme o
  * `addressVisibility`, e `montarEndereco` é o único lugar que decide. Estar
  * nesta lista significa "pode sair em alguma configuração", não "sai sempre".
+ *
+ * `code` entrou nesta lista em 29/10/2026; até ali era privado. Ele já saía de
+ * qualquer jeito, dentro do slug (`apartamento-no-pinheiros-ap-001`, decisão
+ * do B1), e o código no anúncio é o padrão do mercado: o cliente escreve "vi o
+ * AP-001" no WhatsApp e o corretor acha o imóvel na hora. O motivo que o
+ * mantinha privado — revelar o tamanho da carteira — é fraco: a numeração é
+ * por tipo, e é editável justamente para a imobiliária usar a sua.
  */
 export const COLUNAS_PUBLICAS_DE_IMOVEL = [
   'id',
+  'code',
   'slug',
   'title',
   'description',
@@ -87,8 +95,6 @@ export const COLUNAS_PUBLICAS_DE_IMOVEL = [
 /**
  * Colunas do `Property` que **nunca** saem, com o motivo de cada uma.
  *
- * - `code`: numeração interna da imobiliária. Revela o tamanho da carteira e
- *   serve de chave para cruzar anúncios entre portais
  * - `organizationId` e `ownerMemberId`: identificadores internos. O §5 proíbe
  *   devolver qualquer `userId`, e `ownerMemberId` leva a um.
  *
@@ -114,7 +120,6 @@ export const COLUNAS_PUBLICAS_DE_IMOVEL = [
  */
 export const COLUNAS_PRIVADAS_DE_IMOVEL = [
   'organizationId',
-  'code',
   'zipCode',
   'latitude',
   'longitude',
@@ -220,6 +225,8 @@ export type EnderecoPublico = {
 
 export type RespostaPublicaDeImovel = {
   id: string;
+  /** "AP-001", ou a numeração da própria imobiliária. */
+  codigo: string;
   slug: string;
   titulo: string;
   descricao: string | null;
@@ -273,6 +280,7 @@ export type RespostaPublicaDeOrganizacao = {
 /** O imóvel como o `select` do serviço o carrega. */
 type ImovelCarregado = {
   id: string;
+  code: string;
   slug: string;
   title: string;
   description: string | null;
@@ -378,6 +386,7 @@ export function paraImovelPublico(
 
   return {
     id: imovel.id,
+    codigo: imovel.code,
     slug: imovel.slug,
     titulo: imovel.title,
     descricao: imovel.description,

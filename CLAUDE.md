@@ -121,7 +121,7 @@ Três decisões a não reabrir:
 - **Nenhum formulário de interesse antes do C5.** Formulário que não envia é pior que nenhum; até lá aparece o contato público, e o bloco some quando não há contato
 - **Galeria por `scroll-snap`, sem JavaScript**, e planta com `object-contain`
 
-**Divergência aberta para decisão:** o slug do imóvel carrega o código (`...-ap-001`, decisão do B1), e o C2 classifica `code` como privado. O código está na URL de todo anúncio. Registrado em `docs/roadmap.md`, pendências.
+**O código do imóvel é público desde 29/10/2026.** O C1 revelou que ele já saía no slug (`...-ap-001`, decisão do B1) enquanto o C2 o classificava como privado. Decidido a favor de público, antes do lançamento, quando não havia link compartilhado a quebrar: o código no anúncio é padrão do mercado e é o que o cliente cita no WhatsApp. O anúncio mostra "Cód. AP-001" e pede ao visitante que o informe no contato. Registrado em `docs/data-model.md` §5. Um teste novo exige o código na resposta pública: são **789 testes**.
 
 Verificação de 360px sem ferramenta de navegador: o Edge headless tem largura mínima de janela acima de 360px e **recorta** a captura, parecendo transbordamento. Carregar a página dentro de um `<iframe>` de 360px dá a medida real.
 

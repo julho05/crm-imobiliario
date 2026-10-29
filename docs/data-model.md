@@ -268,7 +268,7 @@ Organization 1──N Visit, Task, Activity, PipelineStage, Invitation
 
 | Públicos | Privados — nunca saem da API pública |
 |---|---|
-| `title`, `description`, `type`, `purpose` | `code` (código interno) |
+| `title`, `description`, `type`, `purpose`, `code` | `organizationId` |
 | `price`, `rentPrice`, `condoFee`, `iptu` | `ownerMemberId` e qualquer `userId` |
 | `bedrooms`, `bathrooms`, `suites`, `parkingSpots` | `street`, `number`, `complement` (conforme `addressVisibility`) |
 | `areaTotal`, `areaUseful` | `zipCode` |
@@ -276,6 +276,8 @@ Organization 1──N Visit, Task, Activity, PipelineStage, Invitation
 | fotos e plantas (`PHOTO`, `FLOORPLAN`) | `PropertyMedia.kind = DOCUMENT` |
 | `PropertyFeature` | notas internas, histórico, `Activity` |
 | `slug`, `publishedAt` | dados do proprietário do imóvel |
+
+**[DECIDIDO 29/10/2026]** O **código do imóvel é público**; até ali estava entre os privados. Ele já saía no slug (`apartamento-no-pinheiros-ap-001`, decisão do B1), e mostrá-lo é o padrão do mercado: o cliente cita "AP-001" no WhatsApp e o corretor acha o imóvel na hora. O motivo que o mantinha privado — revelar o tamanho da carteira — é fraco, porque a numeração é por tipo e editável. A alternativa, tirar o código do slug, exigiria outro desempate para a unicidade e só seria barata antes do lançamento; a decisão foi tomada justamente nesse momento, para não ser reaberta depois.
 
 **[DECIDIDO 23/10/2026]** As coordenadas **não saem em nível nenhum** — nem com `FULL`. Das duas saídas que estavam em aberto (deslocar dentro de um raio ou omitir), fica a segunda, por dois motivos: não há mapa no MVP, então a coordenada não tem para que servir hoje; e coordenada deslocada é precisão falsa num JSON que qualquer pessoa lê — quem quiser o ponto exato compara dois imóveis vizinhos e estreita o raio. Quando houver mapa, o deslocamento se decide junto com ele, com raio escolhido para o que o mapa mostra. Continua valendo o motivo original: devolver o ponto exato e desenhar um círculo na tela não protege nada.
 

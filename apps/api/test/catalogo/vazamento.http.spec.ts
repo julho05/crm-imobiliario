@@ -156,10 +156,11 @@ describe('a resposta publica nao carrega o que e privado', () => {
    * Os nomes em **português** dos campos privados, que é como eles sairiam se
    * alguém os acrescentasse ao DTO — mais os nomes em inglês, que é como eles
    * sairiam se alguém devolvesse o registro do Prisma direto.
+   *
+   * `codigo` e `code` saíram desta lista em 29/10/2026, quando o código do
+   * imóvel passou a ser público — ver `COLUNAS_PUBLICAS_DE_IMOVEL`.
    */
   const PROIBIDOS = [
-    'codigo',
-    'code',
     'organizationId',
     'organizacaoId',
     'ownerMemberId',
@@ -201,6 +202,25 @@ describe('a resposta publica nao carrega o que e privado', () => {
 
     expect(resposta.status).toBe(200);
     conferirSemProibidos(await resposta.json());
+  });
+
+  it('o codigo do imovel sai, porque e publico desde 29/10/2026', async () => {
+    await publicarImovelCompleto();
+
+    const { code } = await prisma.property.findUniqueOrThrow({
+      where: { id: cenario.imovelDeA1 },
+      select: { code: true },
+    });
+
+    const detalhe = (await (
+      await obter('/publico/organizacoes/org-a/imoveis/a-001')
+    ).json()) as { imovel: { codigo: string } };
+    const lista = (await (
+      await obter('/publico/organizacoes/org-a/imoveis')
+    ).json()) as { imoveis: { codigo: string }[] };
+
+    expect(detalhe.imovel.codigo).toBe(code);
+    expect(lista.imoveis[0].codigo).toBe(code);
   });
 
   it('e nenhum valor privado aparece, mesmo com nome de campo diferente', async () => {

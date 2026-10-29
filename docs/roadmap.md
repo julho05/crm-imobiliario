@@ -371,7 +371,7 @@ Decisões tomadas durante a implementação:
 
 Verificado contra o servidor em execução: com imóveis vendido, alugado, inativo e rascunho **publicados à força** no banco, nenhum aparece e o acesso direto responde 404; os três níveis de endereço saem como `montarEndereco` decide, e o CEP em nenhum; foto e planta enviadas pelo fluxo do B4 aparecem na galeria e na capa do cartão; as duas páginas cabem em 360px. Um defeito apareceu na captura de tela e foi corrigido: o cartão encolhia até o conteúdo, e a grade saía com larguras diferentes.
 
-**Divergência encontrada, para decisão do responsável:** o slug do imóvel é montado com o título **e o código** (`apartamento-no-pinheiros-ap-001`, decisão do B1), e o C2 classifica `code` como coluna **privada** — "revela o tamanho da carteira". O código sai, portanto, na URL de todo anúncio. Corrigir muda os links já compartilhados e precisa de outro desempate para a unicidade do slug; manter exige tirar `code` da lista privada, já que a imobiliária usa o código no próprio anúncio (decisão de 21/10/2026). Ver a tabela de pendências.
+**Divergência encontrada e decidida no mesmo dia:** o slug do imóvel é montado com o título **e o código** (`apartamento-no-pinheiros-ap-001`, decisão do B1), e o C2 classificava `code` como coluna **privada**. O código já saía na URL de todo anúncio. **Decidido em 29/10/2026: o código é público** — ver `data-model.md` §5. Ele passou para `COLUNAS_PUBLICAS_DE_IMOVEL`, sai como `codigo` na API pública, com teste que exige a presença dele, e o anúncio mostra "Cód. AP-001" e pede ao visitante que o informe no contato.
 
 ---
 
@@ -407,7 +407,7 @@ Um corretor entra, cadastra e publica imóvel, recebe lead do catálogo, agenda 
 | ~~Campos obrigatórios do imóvel~~ | ~~B1~~ | **Decidido em 21/10/2026**: piso do banco mais preço coerente com a finalidade. Ver `packages/shared/src/schemas/imovel.ts` |
 | Unificar leads duplicados no MVP | B5 | Responsável |
 | Mecanismo anti-spam | C6 | Responsável (custo e LGPD) |
-| Código do imóvel no slug público: tirar do slug ou reclassificar `code` como público | Coerência entre B1 e C2; quanto mais tarde, mais links compartilhados quebram | Responsável |
+| ~~Código do imóvel no slug público~~ | ~~Coerência entre B1 e C2~~ | **Decidido em 29/10/2026: o código é público.** Ver `data-model.md` §5 |
 | Parecer jurídico sobre anonimização | D6, piloto | Advogado — **não é decisão técnica** |
 | Marca verificada no INPI e Registro.br | Qualquer uso público | Responsável |
 | ~~Seis etapas do funil ou cinco?~~ | ~~A2~~ | **Seis**, confirmado em 21/10/2026: era divergência de redação, não decisão em aberto. O código já semeava seis desde o A2, e `data-model.md` §3.4 foi corrigido |

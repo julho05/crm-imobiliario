@@ -244,6 +244,7 @@ export class CatalogoService {
  */
 const SELECAO_PUBLICA_DE_IMOVEL = {
   id: true,
+  code: true,
   slug: true,
   title: true,
   description: true,
