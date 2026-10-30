@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Botao "Run workflow" na aba Actions. Em 30/10/2026 o GitHub recebeu um push
+  # para o main sem criar a execucao, e sem isto a unica saida era outro push.
+  workflow_dispatch:
 
 # Cancela execucoes antigas do mesmo branch: so o ultimo commit interessa.
 concurrency:

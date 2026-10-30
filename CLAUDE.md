@@ -1,6 +1,6 @@
 # Doverni — Instruções permanentes para Claude Code
 
-> Repositório **privado**. Este arquivo é versionado para acompanhar o projeto entre máquinas.
+> Repositório **público** desde 30/10/2026, como portfólio — decisão do responsável. Este arquivo é versionado e, portanto, **público**: nada de segredo, credencial ou dado real aqui, nem em `docs/`. O histórico foi varrido na abertura (28 commits): nenhum `.env`, chave ou dado pessoal versionado.
 
 ## Objetivo
 Construir um SaaS brasileiro de CRM imobiliário com catálogo público de imóveis para corretores autônomos e imobiliárias, com assinatura recorrente. Entregar um MVP seguro, responsivo, simples de usar e possível de hospedar em serviço Node.js gerenciado.
