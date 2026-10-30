@@ -175,6 +175,19 @@ Busca filtrada responde `noindex, follow`, e `metadataBase` vem de `WEB_ORIGIN` 
 
 Verificação de 360px **sem iframe**: `Emulation.setDeviceMetricsOverride` pelo CDP fixa a largura em 360 sem o recorte da janela mínima do Edge, e permite medir `scrollWidth` em vez de olhar captura.
 
+Em 30/10/2026 entrou a **tela de equipe** — `/painel/equipe` —, que fecha o item 2 do escopo do MVP: até ali a imobiliária só conseguia montar a equipe por `curl`. Convidar, revogar convite, trocar papel e remover membro. São **930 testes**, sem migration.
+
+**A tela não tem nenhuma regra do §4.4 escrita.** Cada membro chega da API com `podeAlterarPapel` e `podeRemover`, calculados por `podeAgirSobreMembro`, e os papéis oferecidos saem de `papeisQuePodeConvidar()`. E-mail, data de entrada e carteira só saem para quem tem `equipe:alterarPapel`.
+
+Quatro decisões a não reabrir:
+
+- **Remover é suspender** (`SUSPENDED`), nunca apagar o vínculo — auditoria e histórico apontam para o `Membership`
+- **Um destino para toda a carteira**, na mesma transação da suspensão. Muda de dono o que está em aberto; visita realizada, tarefa concluída e cliente excluído ficam com quem saiu. Contagem e transferência usam **um** recorte (`RECORTE_DA_CARTEIRA`)
+- **A troca de papel tem o teto do convite**: `ADMIN` não promove a `ADMIN`, senão a hierarquia do convite cairia em dois passos
+- Destino inválido — de outra organização, suspenso, a própria pessoa — responde **404**, como na atribuição de lead
+
+Ficam para depois: **reativar** membro removido e **transferir propriedade**. Verificado no Edge headless a 360px, com convite, aceite, troca de papel e remoção de uma pessoa nova.
+
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 
 ### Decisões já tomadas — não reabrir sem motivo

@@ -9,6 +9,7 @@ import {
   ListChecks,
   Store,
   TrendingUp,
+  UserCog,
   Users,
 } from 'lucide-react';
 import { podeFazer, type Acao, type Role } from '@app/shared';
@@ -30,8 +31,8 @@ import { cn } from '@/lib/utils';
  *
  * ## So o que existe
  *
- * Esta lista tem sete itens porque sao as sete secoes construidas. Equipe,
- * auditoria e perfil entram **quando existirem**:
+ * Esta lista tem oito itens porque sao as oito secoes construidas. Auditoria e
+ * perfil entram **quando existirem**:
  * menu que leva a tela vazia ou a 404 e pior do que menu curto, porque ensina a
  * pessoa a nao confiar na navegacao.
  *
@@ -86,6 +87,13 @@ const ITENS: ItemDeMenu[] = [
     href: '/painel/tarefas',
     icone: ListChecks,
     acao: 'negociacao:ver',
+  },
+  {
+    // Os quatro papeis: o corretor ve nome e papel dos colegas (§4.4).
+    rotulo: 'Equipe',
+    href: '/painel/equipe',
+    icone: UserCog,
+    acao: 'equipe:verMembros',
   },
   {
     // Por `editarSlug`, e não `ver`: hoje a tela só serve para trocar o

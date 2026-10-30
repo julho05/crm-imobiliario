@@ -267,6 +267,14 @@ Convite respeita a hierarquia: `OWNER` convida qualquer papel, `ADMIN` não conv
 
 Ninguém altera o próprio papel, nem o `OWNER`. Transferir propriedade é operação atômica e separada, com confirmação forte.
 
+**Construída em 30/10/2026.** O que a construção mudou na proposta acima:
+
+1. **Não existe `/painel/equipe/convidar`.** O convite é um formulário de dois campos no topo da própria tela; uma rota separada seria uma navegação a mais para e-mail e papel. Com um papel só disponível (o gerente convida apenas corretor), o seletor já vem marcado
+2. **Os botões vêm da API, não do papel da sessão.** Cada membro chega com `podeAlterarPapel` e `podeRemover`, calculados por `podeAgirSobreMembro`. A tela não tem nenhuma regra do §4.4 escrita
+3. **"Remover" mostra a carteira antes de pedir o destino** ("12 clientes, 3 visitas pendentes") e o destino é **um** membro ativo para tudo. O removido continua na lista de quem administra, marcado "Removido", e some para os demais
+4. **A troca de papel tem o mesmo teto do convite:** o `ADMIN` não promove ninguém a `ADMIN`. Sem isso, a hierarquia do convite seria contornada em dois passos
+5. **Os convites pendentes só são buscados por quem pode convidar**, e o botão "Revogar" só aparece no convite cujo papel a pessoa poderia convidar
+
 ### `/painel/organizacao`
 
 Dados, logo, contato público, bio e `slug`. Só `OWNER` e `ADMIN`.

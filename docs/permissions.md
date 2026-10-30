@@ -124,6 +124,15 @@ Legenda: `ORG` = todos da organização · `OWN` = só os próprios · `—` = s
 - Ninguém altera o próprio papel, nem o `OWNER`.
 - Remover um membro **não apaga** os dados dele. Ao remover, o sistema **exige** destino para imóveis, leads, negociações e visitas atribuídos.
 
+**Construído em 30/10/2026** (`apps/api/src/equipe/membros.service.ts`), com quatro decisões:
+
+- **Remover é suspender.** O vínculo passa a `SUSPENDED` e não é apagado: auditoria e histórico apontam para o `Membership`. A guarda corta o acesso na requisição seguinte (A6). Reativar ainda não existe
+- **Um destino para toda a carteira**, numa transação com a suspensão e a auditoria (`membro.removido`, com as contagens). Destino precisa ser membro **ativo desta** organização e não a própria pessoa; qualquer outro caso responde **404**, como na atribuição de lead
+- **O que muda de dono:** imóveis, clientes e negociações não excluídos, visitas agendadas ou confirmadas e tarefas abertas. Visita realizada, tarefa concluída e cliente excluído **ficam** com quem saiu — são registro do que aconteceu. A contagem mostrada na tela e a transferência usam o mesmo recorte (`RECORTE_DA_CARTEIRA`)
+- **A troca de papel respeita o teto do convite** (`papeisQuePodeConvidar`): o `ADMIN` não promove a `ADMIN`. Membro removido não muda de papel (409)
+
+Na listagem da equipe (`GET /equipe/membros/detalhes`), e-mail, data de entrada e carteira saem só para quem tem `equipe:alterarPapel`.
+
 ### 4.5 Organização, plano e catálogo público
 
 | Ação | OWNER | ADMIN | MANAGER | AGENT |

@@ -70,6 +70,8 @@ Situação em 20/10/2026: **A1 a A10 concluídos.** Verificável com `npm run ve
 
 **A11 fechou em 29/10/2026** — ver a seção dele abaixo da tabela. Com ele, a Fase 1 está completa.
 
+**Tela de equipe em 30/10/2026** — o item 2 do escopo do MVP só existia pela API. `/painel/equipe` convida, revoga convite, troca papel e remove membro com transferência da carteira. Três rotas novas (`GET /equipe/membros/detalhes`, `PATCH /equipe/membros/:id/papel`, `POST /equipe/membros/:id/remover`), com 40 testes em `apps/api/test/equipe/administracao.http.spec.ts`. Decisões em [permissions.md](permissions.md) §4.4. Ficam para depois: **reativar** membro removido e **transferir propriedade**.
+
 **Limitação conhecida do A9.** As respostas são idênticas em status e corpo, mas o *tempo* de resposta não é: quando a conta existe, há escrita no banco e envio de e-mail. Com o adaptador de log a diferença é desprezível; com um provedor real, a latência da chamada tornaria a existência da conta observável por cronômetro. A correção é enviar fora do caminho da requisição, e ela entra junto com a escolha do provedor.
 
 O cenário base de [permissions.md](permissions.md) §8.1 — duas organizações completas e a pessoa com dois vínculos — já existe em `apps/api/test/apoio/cenario-de-duas-organizacoes.ts` e é o alicerce do A12.
