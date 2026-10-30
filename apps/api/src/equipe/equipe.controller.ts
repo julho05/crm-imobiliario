@@ -136,8 +136,14 @@ export class EquipeController {
     };
   }
 
+  /**
+   * So quem convida ve os convites. Ate 30/10/2026 a rota exigia
+   * `equipe:verMembros`, que o `AGENT` tem — e o corretor recebia o e-mail de
+   * quem ainda nem entrou na organizacao, o mesmo dado que o §4.4 lhe nega
+   * sobre os colegas que ja entraram.
+   */
   @Get('convites')
-  @Exige('equipe:verMembros')
+  @Exige('equipe:convidarAgent')
   listar(@Req() requisicao: RequisicaoAutorizada) {
     return this.convites
       .listarPendentes(requisicao.autorizacao)

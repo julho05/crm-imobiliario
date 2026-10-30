@@ -133,6 +133,8 @@ Legenda: `ORG` = todos da organização · `OWN` = só os próprios · `—` = s
 
 Na listagem da equipe (`GET /equipe/membros/detalhes`), e-mail, data de entrada e carteira saem só para quem tem `equipe:alterarPapel`.
 
+**Corrigido em 30/10/2026:** `GET /equipe/convites` exigia `equipe:verMembros`, que o `AGENT` tem, e entregava ao corretor o e-mail de quem foi convidado — o dado que esta seção lhe nega sobre os colegas. Agora exige `equipe:convidarAgent`: só vê convite quem convida.
+
 ### 4.5 Organização, plano e catálogo público
 
 | Ação | OWNER | ADMIN | MANAGER | AGENT |

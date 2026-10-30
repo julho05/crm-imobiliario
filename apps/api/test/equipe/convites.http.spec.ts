@@ -294,6 +294,23 @@ describe('GET e DELETE /api/equipe/convites', () => {
     expect(corpoDeA.convites[0].expirado).toBe(false);
   });
 
+  it('o corretor não lista convites: são e-mails de quem nem entrou', async () => {
+    await convidar('AGENT', cenario.ownerA.cookie);
+
+    const resposta = await obter('/equipe/convites', cenario.agenteA1.cookie);
+
+    expect(resposta.status).toBe(403);
+    expect(await resposta.text()).not.toContain(CONVIDADO);
+  });
+
+  it('o gerente lista convites, porque convida', async () => {
+    await convidar('AGENT', cenario.ownerA.cookie);
+
+    const resposta = await obter('/equipe/convites', cenario.managerA.cookie);
+
+    expect(resposta.status).toBe(200);
+  });
+
   it('a listagem não devolve o hash do token', async () => {
     await convidar('AGENT', cenario.ownerA.cookie);
 

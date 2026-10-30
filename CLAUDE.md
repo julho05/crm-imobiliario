@@ -188,6 +188,8 @@ Quatro decisões a não reabrir:
 
 Ficam para depois: **reativar** membro removido e **transferir propriedade**. Verificado no Edge headless a 360px, com convite, aceite, troca de papel e remoção de uma pessoa nova.
 
+**Vazamento do A10 encontrado ao construir a tela, e corrigido no mesmo dia:** `GET /equipe/convites` exigia `equipe:verMembros`, que o corretor tem, e devolvia o e-mail de cada convidado. Agora exige `equipe:convidarAgent`. São **932 testes**. Foi o terceiro vazamento achado por quem usa a rota, não por quem a escreveu: o teste do A10 conferia quem **convida**, e ninguém perguntou quem **lê**.
+
 Continua valendo: **não** executar migrations, criar commits, alterar infraestrutura ou adicionar dependências sem autorização explícita do responsável. Primeiro examine este arquivo e os documentos da pasta `docs/`; em caso de conflito, apresente as divergências para decisão.
 
 ### Decisões já tomadas — não reabrir sem motivo
